@@ -10,30 +10,30 @@ struct OverlayContentView: View {
 
     var body: some View {
         ZStack {
-            Circle()
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .overlay(
-                    Circle()
+                    RoundedRectangle(cornerRadius: 17, style: .continuous)
                         .strokeBorder(
                             viewModel.isRecording ? Color.red.opacity(0.6) : Color.primary.opacity(0.15),
                             lineWidth: 1.5
                         )
                 )
-                .frame(width: 48, height: 48)
+                .frame(width: 80, height: 34)
 
             if viewModel.isRecording {
                 WaveformView(audioLevel: viewModel.audioLevel)
                     .transition(.opacity)
             } else {
                 Image(systemName: "waveform")
-                    .font(.custom("League Spartan", size: 20).weight(.medium))
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.primary.opacity(0.7))
                     .transition(.opacity)
             }
         }
-        .frame(width: 56, height: 56)
+        .frame(width: 88, height: 42)
         .scaleEffect(tapScale)
-        .contentShape(Circle())
+        .contentShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
         .gesture(
             DragGesture()
                 .onChanged { value in

@@ -6,7 +6,7 @@ struct PermissionDeniedView: View {
     var body: some View {
         VStack(spacing: 24) {
             Image(systemName: "lock.shield")
-                .font(.custom("League Spartan", size: 48))
+                .font(.custom("League Spartan", size: 42))
                 .foregroundStyle(.secondary)
 
             Text("Permissions Required")

@@ -22,10 +22,10 @@ struct WaveformView: View {
 
     private func barHeight(for index: Int, date: Date) -> CGFloat {
         let time = date.timeIntervalSinceReferenceDate
-        let offset = Double(index) * 0.6
-        let wave = sin(time * 6.0 + offset) * 0.5 + 0.5
-        let level = CGFloat(max(audioLevel, 0.05))
-        let height = 4.0 + level * 20.0 * wave
-        return min(max(height, 4), 28)
+        let offset = Double(index) * 0.65
+        let wave = sin(time * 8.0 + offset) * 0.5 + 0.5
+        let level = CGFloat(max(audioLevel, 0.03))
+        let height = 2.0 + level * 36.0 * wave
+        return min(max(height, 2), 22)
     }
 }

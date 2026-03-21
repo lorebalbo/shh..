@@ -303,7 +303,7 @@ struct HelpView: View {
     private func shortcutRow(key: String, description: String) -> some View {
         HStack(spacing: 12) {
             Text(key)
-                .font(.custom("League Spartan", size: 17).monospaced())
+                .font(.custom("League Spartan", size: 15).monospaced())
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background(.quaternary)
@@ -324,7 +324,7 @@ private struct OnboardingSheet: View {
     var body: some View {
         VStack(spacing: 24) {
             Image(systemName: "waveform")
-                .font(.custom("League Spartan", size: 48))
+                .font(.custom("League Spartan", size: 42))
                 .foregroundStyle(.tint)
 
             Text("Welcome to SHH")

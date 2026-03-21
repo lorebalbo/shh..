@@ -15,7 +15,7 @@ final class OverlayWidgetController {
 
     // MARK: - Constants
 
-    static let widgetSize = CGSize(width: 56, height: 56)
+    static let widgetSize = CGSize(width: 88, height: 42)
 
     private enum UserDefaultsKey {
         static let positionX = "SHH_OverlayPositionX"
