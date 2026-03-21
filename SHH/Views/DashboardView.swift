@@ -183,6 +183,7 @@ private struct SidebarRow: View {
     let isSelected: Bool
     let isCollapsed: Bool
     let action: () -> Void
+    @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
@@ -201,11 +202,20 @@ private struct SidebarRow: View {
             .frame(width: isCollapsed ? 44 : 160, alignment: .leading)
             .contentShape(Rectangle())
             .clipped() // Fixed icon centering with smooth collapse!
-            .background(isSelected ? Color.appForeground.opacity(0.15) : Color.clear)
-            .foregroundStyle(isSelected ? Color.appError : Color.appForeground.opacity(0.8))
+            .background(
+                isSelected
+                    ? Color.appForeground.opacity(0.15)
+                    : (isHovered ? Color.appForeground.opacity(0.08) : Color.clear)
+            )
+            .foregroundStyle(
+                isSelected
+                    ? Color.appError
+                    : (isHovered ? Color.appForeground : Color.appForeground.opacity(0.8))
+            )
             .clipShape(RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
         .help(isCollapsed ? section.label : "")
     }
 }
@@ -238,8 +248,7 @@ struct HelpView: View {
             Spacer()
         }
         .padding(.horizontal, 24)
-        .padding(.top, 20)
-        .padding(.bottom, 12)
+        .frame(height: 52)
     }
 
     private var gettingStartedSection: some View {

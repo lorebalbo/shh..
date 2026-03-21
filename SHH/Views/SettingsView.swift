@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var showProviderSheet = false
     @State private var editingProvider: LLMProviderConfig?
     @State private var showClearHistoryConfirmation = false
+    @State private var isAddProviderHovered = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -45,8 +46,7 @@ struct SettingsView: View {
             Spacer()
         }
         .padding(.horizontal, 24)
-        .padding(.top, 20)
-        .padding(.bottom, 12)
+        .frame(height: 52)
     }
 
     // MARK: - LLM Providers Section
@@ -61,9 +61,16 @@ struct SettingsView: View {
                     Button {
                         showProviderSheet = true
                     } label: {
-                        Label("Add Provider", systemImage: "plus")
+                        Image(systemName: "plus")
+                            .font(Font.appTitle3)
+                            .frame(width: 28, height: 28)
+                            .background(isAddProviderHovered ? Color.appForeground.opacity(0.15) : Color.clear)
+                            .foregroundStyle(isAddProviderHovered ? Color.appError : Color.appForeground.opacity(0.8))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
-                    .controlSize(.small)
+                    .buttonStyle(.plain)
+                    .onHover { isAddProviderHovered = $0 }
+                    .help("Add Provider")
                 }
 
                 if providers.isEmpty {
@@ -225,7 +232,7 @@ private struct ProviderRow: View {
             Button(action: onToggleActive) {
                 Image(systemName: provider.isActive ? "checkmark.circle.fill" : "circle")
                     .font(Font.appTitle3)
-                    .foregroundStyle(provider.isActive ? .green : .secondary)
+                    .foregroundStyle(provider.isActive ? Color.appError : .secondary)
             }
             .buttonStyle(.plain)
             .help(provider.isActive ? "Deactivate provider" : "Activate provider")
@@ -239,8 +246,8 @@ private struct ProviderRow: View {
                             .font(Font.appCaption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 1)
-                            .background(.green.opacity(0.15))
-                            .foregroundStyle(.green)
+                            .background(Color.appError.opacity(0.15))
+                            .foregroundStyle(Color.appError)
                             .clipShape(Capsule())
                     }
                 }

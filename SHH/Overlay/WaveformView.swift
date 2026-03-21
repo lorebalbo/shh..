@@ -25,7 +25,7 @@ struct WaveformView: View {
         let offset = Double(index) * 0.65
         let wave = sin(time * 8.0 + offset) * 0.5 + 0.5
         let level = CGFloat(max(audioLevel, 0.03))
-        let height = 2.0 + level * 36.0 * wave
-        return min(max(height, 2), 22)
+        let height = 2.0 + level * 16.0 * wave
+        return min(max(height, 1.5), 10)
     }
 }

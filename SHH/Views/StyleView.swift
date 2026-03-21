@@ -6,6 +6,7 @@ struct StyleView: View {
     @Query(sort: \Style.name) private var styles: [Style]
     @State private var showCreateSheet = false
     @State private var editingStyle: Style?
+    @State private var isAddHovered = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,14 +39,19 @@ struct StyleView: View {
             Button {
                 showCreateSheet = true
             } label: {
-                Label("New Style", systemImage: "plus")
+                Image(systemName: "plus")
+                    .font(Font.appTitle3)
+                    .frame(width: 28, height: 28)
+                    .background(isAddHovered ? Color.appForeground.opacity(0.15) : Color.clear)
+                    .foregroundStyle(isAddHovered ? Color.appError : Color.appForeground.opacity(0.8))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
+            .buttonStyle(.plain)
+            .onHover { isAddHovered = $0 }
+            .help("New Style")
         }
         .padding(.horizontal, 24)
-        .padding(.top, 20)
-        .padding(.bottom, 12)
+        .frame(height: 52)
     }
 
     // MARK: - Empty State
@@ -111,7 +117,7 @@ private struct StyleRow: View {
             Button(action: onToggleActive) {
                 Image(systemName: style.isActive ? "checkmark.circle.fill" : "circle")
                     .font(Font.appTitle3)
-                    .foregroundStyle(style.isActive ? .green : .secondary)
+                    .foregroundStyle(style.isActive ? Color.appError : .secondary)
             }
             .buttonStyle(.plain)
             .help(style.isActive ? "Deactivate style" : "Activate style")
@@ -125,8 +131,8 @@ private struct StyleRow: View {
                             .font(Font.appCaption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 1)
-                            .background(.green.opacity(0.15))
-                            .foregroundStyle(.green)
+                            .background(Color.appError.opacity(0.15))
+                            .foregroundStyle(Color.appError)
                             .clipShape(Capsule())
                     }
                 }

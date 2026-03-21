@@ -66,8 +66,7 @@ struct HomeView: View {
             .frame(width: 250)
         }
         .padding(.horizontal, 24)
-        .padding(.top, 20)
-        .padding(.bottom, 12)
+        .frame(height: 52)
     }
 
     // MARK: - Empty State
@@ -123,6 +122,8 @@ private struct DictationEntryRow: View {
     let isExpanded: Bool
     let onToggle: () -> Void
     @State private var selectedTab: EntryTab = .processed
+    @State private var isCopyHovered = false
+    @State private var isRowHovered = false
 
     private enum EntryTab: String, CaseIterable {
         case processed = "Processed"
@@ -167,7 +168,8 @@ private struct DictationEntryRow: View {
                             .font(Font.appTitle3)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(Color.appForeground.opacity(0.8))
+                    .foregroundStyle(isCopyHovered ? Color.appError : Color.appForeground.opacity(0.8))
+                    .onHover { isCopyHovered = $0 }
                     .help("Copy Text")
                 }
             }
@@ -184,7 +186,11 @@ private struct DictationEntryRow: View {
                 .allowsHitTesting(isExpanded)
         }
         .padding(12)
-        .background(Color.appForeground.opacity(0.05))
+        .background(
+            isRowHovered
+                ? Color.appForeground.opacity(0.08)
+                : Color.appForeground.opacity(0.05)
+        )
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
              RoundedRectangle(cornerRadius: 8)
@@ -193,6 +199,7 @@ private struct DictationEntryRow: View {
         .listRowSeparator(.hidden)
         .padding(.vertical, 2)
         .contentShape(Rectangle())
+        .onHover { isRowHovered = $0 }
         .onTapGesture(perform: onToggle)
     }
 
