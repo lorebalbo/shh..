@@ -1,0 +1,43 @@
+# Xcode
+#
+# Xcode files/directories that should be ignored
+
+build/
+*.pbxproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+*.hmap
+*.xccheckout
+*.moved-aside
+*.xcuserstate
+*.xcscmblueprint
+
+# CocoaPods
+Pods/
+*.xcworkspace
+
+# Carthage
+Carthage/Build/
+
+# Swift Package Manager
+.build/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+# Other
+*.swp
+*~.nib
+
+# XcodeGen specific
+SHH.xcodeproj
