@@ -11,7 +11,8 @@ final class OverlayPanel: NSPanel {
 /// Manages the always-on-top overlay widget displayed as a borderless,
 /// translucent NSPanel. The panel floats above all windows and never
 /// steals focus from the active application.
-final class OverlayWidgetController {
+/// Conforms to @unchecked Sendable because all mutations happen on the main thread.
+final class OverlayWidgetController: @unchecked Sendable {
 
     // MARK: - Constants
 

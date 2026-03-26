@@ -22,6 +22,8 @@ struct HomeView: View {
         VStack(spacing: 0) {
             header
             Divider()
+            diagnosticPanel
+            Divider()
             if filteredEntries.isEmpty {
                 emptyState
             } else {
@@ -36,34 +38,13 @@ struct HomeView: View {
     private var header: some View {
         HStack {
             Text("Home")
-                .font(Font.appLargeTitle)
+                .font(Font.appTitle3)
                 .fontWeight(.bold)
                 .foregroundStyle(Color.appForeground)
             Spacer()
-            
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .font(Font.appBody)
-                    .foregroundStyle(Color.appForeground.opacity(0.6))
-                TextField("Search dictations", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .foregroundStyle(Color.appForeground)
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(Font.appBody)
-                            .foregroundStyle(Color.appForeground.opacity(0.6))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Color.appForeground.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .frame(width: 250)
+            Text("\(entries.count) dictation\(entries.count == 1 ? "" : "s")")
+                .foregroundStyle(Color.appForeground.opacity(0.5))
+                .font(Font.appCallout)
         }
         .padding(.horizontal, 24)
         .frame(height: 52)
@@ -77,20 +58,96 @@ struct HomeView: View {
                 searchText.isEmpty ? "No Dictations Yet" : "No Results",
                 systemImage: searchText.isEmpty ? "waveform" : "magnifyingglass"
             )
-            .foregroundStyle(Color.appForeground)
         } description: {
             Text(
                 searchText.isEmpty
                 ? "Your dictation history will appear here."
                 : "No dictations match \"\(searchText)\"."
             )
-            .foregroundStyle(Color.appForeground.opacity(0.8))
         }
         .frame(maxHeight: .infinity)
     }
 
-    // MARK: - Pipeline Log Removed
+    // MARK: - Diagnostic Log
 
+    private var diagnosticPanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { showDiagnostics.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "waveform.badge.magnifyingglass")
+                        .font(.caption)
+                    Text("Pipeline Log")
+                        .font(.caption)
+                    if !PipelineEventLog.shared.events.isEmpty {
+                        Text("\(PipelineEventLog.shared.events.count)")
+                            .font(.caption2)
+                            .monospacedDigit()
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(.tint.opacity(0.15), in: Capsule())
+                            .foregroundStyle(.tint)
+                    }
+                    Spacer()
+                    if !PipelineEventLog.shared.events.isEmpty {
+                        Button("Clear") { PipelineEventLog.shared.clear() }
+                            .font(.caption)
+                            .buttonStyle(.borderless)
+                            .foregroundStyle(.secondary)
+                    }
+                    Image(systemName: showDiagnostics ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if showDiagnostics {
+                if PipelineEventLog.shared.events.isEmpty {
+                    Text("No events yet. Make a recording to see pipeline activity.")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 2) {
+                            ForEach(PipelineEventLog.shared.events) { event in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text(event.timestamp.formatted(.dateTime.hour().minute().second()))
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .foregroundStyle(.tertiary)
+                                        .frame(width: 72, alignment: .leading)
+                                    Text(event.message)
+                                        .font(.system(.caption, design: .monospaced))
+                                        .foregroundStyle(colorFor(event.kind))
+                                        .textSelection(.enabled)
+                                    Spacer()
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 6)
+                    }
+                    .frame(maxHeight: 180)
+                    .background(Color(.windowBackgroundColor).opacity(0.5))
+                }
+            }
+        }
+    }
+
+    private func colorFor(_ kind: PipelineEvent.Kind) -> Color {
+        switch kind {
+        case .info: return .primary
+        case .success: return .green
+        case .error: return .red
+        }
+    }
 
     // MARK: - Entry List
 
@@ -101,7 +158,7 @@ struct HomeView: View {
                     entry: entry,
                     isExpanded: expandedEntryID == entry.id,
                     onToggle: {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
                             expandedEntryID = (expandedEntryID == entry.id) ? nil : entry.id
                         }
                     }
@@ -111,7 +168,7 @@ struct HomeView: View {
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
         .background(Color.appBackground)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: expandedEntryID)
+        .searchable(text: $searchText, prompt: Text("Search dictations").foregroundStyle(Color.appForeground.opacity(0.4)))
     }
 }
 
@@ -122,8 +179,6 @@ private struct DictationEntryRow: View {
     let isExpanded: Bool
     let onToggle: () -> Void
     @State private var selectedTab: EntryTab = .processed
-    @State private var isCopyHovered = false
-    @State private var isRowHovered = false
 
     private enum EntryTab: String, CaseIterable {
         case processed = "Processed"
@@ -134,73 +189,80 @@ private struct DictationEntryRow: View {
         VStack(alignment: .leading, spacing: 4) {
             // Header
             HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(entry.timestamp, style: .date)
-                        .font(Font.appCaption)
-                        .foregroundStyle(Color.appForeground.opacity(0.6))
-                    + Text("  ")
-                    + Text(entry.timestamp, style: .time)
-                        .font(Font.appCaption)
-                        .foregroundStyle(Color.appForeground.opacity(0.6))
-                }
-                Spacer()
-
-                // Controls always visible
-                HStack(spacing: 12) {
-                    if entry.processedText != nil {
-                        Picker("View", selection: $selectedTab) {
-                            Image(systemName: "wand.and.stars").tag(EntryTab.processed)
-                            Image(systemName: "text.alignleft").tag(EntryTab.raw)
+                // Clickable left side
+                Button(action: onToggle) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(entry.timestamp, style: .date)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            + Text("  ")
+                            + Text(entry.timestamp, style: .time)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .controlSize(.small)
-                        .fixedSize()
-                        .help("Toggle Processed / Original")
-                        .onTapGesture { } // Prevent row tap from firing on picker
+                        Spacer()
                     }
-
-                    Button {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(textForTab, forType: .string)
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                            .font(Font.appTitle3)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(isCopyHovered ? Color.appError : Color.appForeground.opacity(0.8))
-                    .onHover { isCopyHovered = $0 }
-                    .help("Copy Text")
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+
+                // Controls (Visible when expanded)
+                if isExpanded {
+                    HStack(spacing: 12) {
+                        if entry.processedText != nil {
+                            Picker("View", selection: $selectedTab) {
+                                Image(systemName: "wand.and.stars").tag(EntryTab.processed)
+                                Image(systemName: "text.alignleft").tag(EntryTab.raw)
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .controlSize(.small)
+                            .fixedSize()
+                            .help("Toggle Processed / Original")
+                        }
+
+                        Button {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(textForTab, forType: .string)
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .help("Copy Text")
+                    }
+                    .transition(.opacity)
+                }
+
+                // Clickable right chevron
+                Button(action: onToggle) {
+                    Image(systemName: "chevron.right")
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .foregroundStyle(.secondary)
+                        .animation(.easeInOut(duration: 0.2), value: isExpanded)
+                        .padding(.leading, 8)
+                }
+                .buttonStyle(.plain)
             }
             .padding(.bottom, 6)
 
             // Text Content
             Text(textForTab)
                 .lineLimit(isExpanded ? nil : 2)
-                .font(Font.appBody)
+                .font(.body)
                 .textSelection(.enabled)
-                .foregroundStyle(Color.appForeground)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .allowsHitTesting(isExpanded)
         }
         .padding(12)
-        .background(
-            isRowHovered
-                ? Color.appForeground.opacity(0.08)
-                : Color.appForeground.opacity(0.05)
-        )
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
-             RoundedRectangle(cornerRadius: 8)
-                 .stroke(Color.appForeground.opacity(0.1), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
         )
         .listRowSeparator(.hidden)
         .padding(.vertical, 2)
-        .contentShape(Rectangle())
-        .onHover { isRowHovered = $0 }
-        .onTapGesture(perform: onToggle)
     }
 
     private var textForTab: String {

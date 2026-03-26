@@ -26,6 +26,7 @@ struct DashboardView: View {
 enum SidebarSection: String, CaseIterable, Identifiable {
     case home
     case style
+    case llmProviders
     case settings
     case help
 
@@ -35,6 +36,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         switch self {
         case .home: "Home"
         case .style: "Style"
+        case .llmProviders: "Providers"
         case .settings: "Settings"
         case .help: "Help"
         }
@@ -44,6 +46,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         switch self {
         case .home: "house"
         case .style: "paintbrush"
+        case .llmProviders: "brain"
         case .settings: "gearshape"
         case .help: "questionmark.circle"
         }
@@ -59,9 +62,9 @@ private struct DashboardContentView: View {
     var body: some View {
         HStack(spacing: 0) {
             SidebarView(selection: $selectedSection, collapsed: $sidebarCollapsed)
-            
+
             Divider()
-            
+
             detailView
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .frame(minWidth: 400)
@@ -78,7 +81,7 @@ private struct DashboardContentView: View {
                 onGoToSettings: {
                     showOnboarding = false
                     hasCompletedSetup = true
-                    selectedSection = .settings
+                    selectedSection = .llmProviders
                 },
                 onGoToStyles: {
                     showOnboarding = false
@@ -100,6 +103,8 @@ private struct DashboardContentView: View {
             HomeView()
         case .style:
             StyleView()
+        case .llmProviders:
+            LLMProvidersView()
         case .settings:
             SettingsView()
         case .help:
@@ -133,7 +138,7 @@ private struct SidebarView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .transition(.opacity)
                 }
-                
+
                 HStack {
                     Spacer(minLength: 0)
                     Button {
@@ -151,18 +156,18 @@ private struct SidebarView: View {
                 }
             }
             .frame(height: 52)
-            
+
             VStack(alignment: .leading, spacing: 2) {
-                ForEach([SidebarSection.home, SidebarSection.style]) { section in
+                ForEach([SidebarSection.home, SidebarSection.style, SidebarSection.llmProviders]) { section in
                     SidebarRow(section: section, isSelected: selection == section, isCollapsed: collapsed) {
                         selection = section
                     }
                 }
             }
             .padding(.horizontal, 10)
-            
+
             Spacer()
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 ForEach([SidebarSection.settings, SidebarSection.help]) { section in
                     SidebarRow(section: section, isSelected: selection == section, isCollapsed: collapsed) {
@@ -191,7 +196,7 @@ private struct SidebarRow: View {
                 Image(systemName: section.icon)
                     .font(Font.appTitle3) // Ensure smaller icon size
                     .frame(width: 24, alignment: .center)
-                
+
                 Text(section.label)
                     .font(Font.appBody)
                     .lineLimit(1)
@@ -242,7 +247,7 @@ struct HelpView: View {
     private var header: some View {
         HStack {
             Text("Help")
-                .font(Font.appLargeTitle)
+                .font(Font.appTitle3)
                 .fontWeight(.bold)
                 .foregroundStyle(Color.appForeground)
             Spacer()
@@ -292,7 +297,8 @@ struct HelpView: View {
                 .font(Font.appHeadline)
                 .foregroundStyle(Color.appForeground)
             Text("SHH is a macOS voice utility that transcribes speech using on-device Whisper models and optionally processes text through AI styles.")
-                .foregroundStyle(.secondary)
+                .font(Font.appBody)
+                .foregroundStyle(Color.appForeground.opacity(0.6))
         }
         .padding(16)
         .background(Color.appForeground.opacity(0.05))
@@ -304,8 +310,10 @@ struct HelpView: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .frame(width: 20)
-                .foregroundStyle(.tint)
+                .foregroundStyle(Color.appError)
             Text(text)
+                .font(Font.appBody)
+                .foregroundStyle(Color.appForeground)
         }
     }
 
@@ -313,12 +321,14 @@ struct HelpView: View {
         HStack(spacing: 12) {
             Text(key)
                 .font(.custom("League Spartan", size: 15).monospaced())
+                .foregroundStyle(Color.appForeground)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(.quaternary)
+                .background(Color.appForeground.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 4))
             Text(description)
-                .foregroundStyle(.secondary)
+                .font(Font.appBody)
+                .foregroundStyle(Color.appForeground.opacity(0.6))
         }
     }
 }

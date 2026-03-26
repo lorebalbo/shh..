@@ -6,7 +6,9 @@ import SwiftData
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var recordingCoordinator: RecordingCoordinator?
     private var overlayController: OverlayWidgetController?
+    private var stylePickerController: StylePickerController?
     private let overlayViewModel = OverlayViewModel()
+    private let stylePickerViewModel = StylePickerViewModel()
     private var audioLevelCancellable: AnyCancellable?
     var modelContainer: ModelContainer?
 
@@ -17,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         setupRecordingCoordinator()
         setupOverlayWidget()
+        wireStylePicker()
 
         // Retry installing the CGEvent tap whenever the app becomes active.
         // This handles the common case where Accessibility permission is granted
@@ -85,20 +88,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         nonisolated(unsafe) let audioCapture = coordinator.audioCaptureManager
         coordinator.stateMachine.onRecordingDidStart = {
             originalOnStart?()
-            // Read the ACTUAL state after the handler runs. If startRecording() threw
-            // and forceIdle() was called, audioCapture.isRecording == false here.
             let nowRecording = audioCapture.isRecording
-            DispatchQueue.main.async { vm.isRecording = nowRecording }
+            DispatchQueue.main.async {
+                vm.isRecording = nowRecording
+            }
         }
         let originalOnStop = coordinator.stateMachine.onRecordingDidStop
         coordinator.stateMachine.onRecordingDidStop = { mode in
             originalOnStop?(mode)
-            DispatchQueue.main.async { vm.isRecording = false }
+            DispatchQueue.main.async {
+                vm.isRecording = false
+            }
         }
-        // If recording fails to start (e.g. audio engine error), forceIdle() fires
-        // onForcedIdle — clear the recording indicator without any transcription.
         coordinator.stateMachine.onForcedIdle = {
-            DispatchQueue.main.async { vm.isRecording = false }
+            DispatchQueue.main.async {
+                vm.isRecording = false
+            }
         }
 
         // Bind audio level to overlay
@@ -111,18 +116,83 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupOverlayWidget() {
         let controller = OverlayWidgetController(viewModel: overlayViewModel)
-
-        overlayViewModel.onWidgetTapped = { [weak self] in
-            guard let coordinator = self?.recordingCoordinator else { return }
-            if coordinator.stateMachine.state == .idle {
-                coordinator.startLockIn()
-            } else {
-                coordinator.stopCurrentRecording()
-            }
-        }
+        let pickerController = StylePickerController(viewModel: stylePickerViewModel)
 
         controller.show()
         overlayController = controller
+        stylePickerController = pickerController
+    }
+
+    /// Wire the style picker to the recording state machine and widget tap.
+    /// Called after both setupRecordingCoordinator() and setupOverlayWidget().
+    private func wireStylePicker() {
+        guard let coordinator = recordingCoordinator,
+              let widgetController = overlayController,
+              let pickerController = stylePickerController else { return }
+
+        // Wire style selection to persist to SwiftData
+        let container = modelContainer
+        let pickerVM = stylePickerViewModel
+        stylePickerViewModel.onStyleSelected = { selectedId in
+            guard let container else { return }
+            let context = ModelContext(container)
+            let descriptor = FetchDescriptor<Style>()
+            guard let allStyles = try? context.fetch(descriptor) else { return }
+            for style in allStyles {
+                style.isActive = (style.id == selectedId)
+            }
+            try? context.save()
+        }
+
+        // Show/hide picker with recording
+        let vm = overlayViewModel
+        nonisolated(unsafe) let audioCapture = coordinator.audioCaptureManager
+        let pickerCtrl = pickerController
+        let widgetCtrl = widgetController
+
+        let previousOnStart = coordinator.stateMachine.onRecordingDidStart
+        coordinator.stateMachine.onRecordingDidStart = {
+            previousOnStart?()
+            let nowRecording = audioCapture.isRecording
+            DispatchQueue.main.async {
+                vm.isRecording = nowRecording
+                if nowRecording {
+                    if let container {
+                        let context = ModelContext(container)
+                        pickerVM.reload(from: context)
+                    }
+                    let widgetFrame = widgetCtrl.panelWindow.frame
+                    pickerCtrl.show(relativeTo: widgetFrame)
+                }
+            }
+        }
+
+        let previousOnStop = coordinator.stateMachine.onRecordingDidStop
+        coordinator.stateMachine.onRecordingDidStop = { mode in
+            previousOnStop?(mode)
+            DispatchQueue.main.async {
+                vm.isRecording = false
+                pickerCtrl.hide()
+            }
+        }
+
+        coordinator.stateMachine.onForcedIdle = {
+            DispatchQueue.main.async {
+                vm.isRecording = false
+                pickerCtrl.hide()
+            }
+        }
+
+        // Widget tap toggles recording + picker
+        nonisolated(unsafe) let coordRef = coordinator
+        overlayViewModel.onWidgetTapped = {
+            if coordRef.stateMachine.state == .idle {
+                coordRef.startLockIn()
+            } else {
+                coordRef.stopCurrentRecording()
+                pickerCtrl.hide()
+            }
+        }
     }
 }
 

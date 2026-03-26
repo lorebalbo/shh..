@@ -1,29 +1,29 @@
 import SwiftUI
 import SwiftData
 
-struct StyleView: View {
+struct LLMProvidersView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Style.name) private var styles: [Style]
+    @Query(sort: \LLMProviderConfig.modelName) private var providers: [LLMProviderConfig]
     @State private var showCreateSheet = false
-    @State private var editingStyle: Style?
+    @State private var editingProvider: LLMProviderConfig?
     @State private var isAddHovered = false
 
     var body: some View {
         VStack(spacing: 0) {
             header
             Divider()
-            if styles.isEmpty {
+            if providers.isEmpty {
                 emptyState
             } else {
-                styleList
+                providerList
             }
         }
         .background(Color.appBackground)
         .sheet(isPresented: $showCreateSheet) {
-            StyleFormSheet(mode: .create)
+            ProviderFormSheet(mode: .create)
         }
-        .sheet(item: $editingStyle) { style in
-            StyleFormSheet(mode: .edit(style))
+        .sheet(item: $editingProvider) { provider in
+            ProviderFormSheet(mode: .edit(provider))
         }
     }
 
@@ -31,7 +31,7 @@ struct StyleView: View {
 
     private var header: some View {
         HStack {
-            Text("Styles")
+            Text("LLM Providers")
                 .font(Font.appTitle3)
                 .fontWeight(.bold)
                 .foregroundStyle(Color.appForeground)
@@ -45,7 +45,7 @@ struct StyleView: View {
             }
             .buttonStyle(.plain)
             .onHover { isAddHovered = $0 }
-            .help("New Style")
+            .help("New Provider")
         }
         .padding(.horizontal, 24)
         .frame(height: 52)
@@ -55,11 +55,11 @@ struct StyleView: View {
 
     private var emptyState: some View {
         ContentUnavailableView {
-            Label("No Styles", systemImage: "paintbrush")
+            Label("No Providers", systemImage: "brain")
         } description: {
-            Text("Create a style to transform your dictated text with AI.")
+            Text("Add an LLM provider to enable AI-powered text processing.")
         } actions: {
-            Button("Create Style") {
+            Button("Add Provider") {
                 showCreateSheet = true
             }
             .buttonStyle(.borderedProminent)
@@ -69,14 +69,14 @@ struct StyleView: View {
 
     // MARK: - List
 
-    private var styleList: some View {
+    private var providerList: some View {
         List {
-            ForEach(styles) { style in
-                StyleRow(
-                    style: style,
-                    onToggleActive: { toggleActive(style) },
-                    onEdit: { editingStyle = style },
-                    onDelete: { deleteStyle(style) }
+            ForEach(providers) { provider in
+                ProviderRow(
+                    provider: provider,
+                    onToggleActive: { toggleActive(provider) },
+                    onEdit: { editingProvider = provider },
+                    onDelete: { deleteProvider(provider) }
                 )
             }
         }
@@ -87,23 +87,23 @@ struct StyleView: View {
 
     // MARK: - Actions
 
-    private func toggleActive(_ style: Style) {
-        if style.isActive {
-            style.isActive = false
+    private func toggleActive(_ provider: LLMProviderConfig) {
+        if provider.isActive {
+            provider.isActive = false
         } else {
-            try? style.activate(in: modelContext)
+            try? provider.activate(in: modelContext)
         }
     }
 
-    private func deleteStyle(_ style: Style) {
-        modelContext.delete(style)
+    private func deleteProvider(_ provider: LLMProviderConfig) {
+        modelContext.delete(provider)
     }
 }
 
-// MARK: - Style Row
+// MARK: - Provider Row
 
-private struct StyleRow: View {
-    let style: Style
+private struct ProviderRow: View {
+    let provider: LLMProviderConfig
     let onToggleActive: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
@@ -111,23 +111,31 @@ private struct StyleRow: View {
     @State private var isRowHovered = false
     @State private var isEditHovered = false
 
+    private var providerLabel: String {
+        switch provider.providerType {
+        case .openAI: "OpenAI"
+        case .anthropic: "Anthropic"
+        case .local: "Local"
+        }
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: style.isActive ? "checkmark.circle.fill" : "circle")
+            Image(systemName: provider.isActive ? "checkmark.circle.fill" : "circle")
                 .font(Font.appTitle3)
-                .foregroundStyle(style.isActive ? Color.appError : Color.appForeground.opacity(0.4))
+                .foregroundStyle(provider.isActive ? Color.appError : Color.appForeground.opacity(0.4))
 
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(style.name)
-                        .font(Font.appBody)
-                        .fontWeight(.medium)
-                        .foregroundStyle(Color.appForeground)
+                Text(providerLabel)
+                    .font(Font.appBody)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.appForeground)
+                if !provider.modelName.isEmpty {
+                    Text(provider.modelName)
+                        .font(Font.appCaption)
+                        .foregroundStyle(Color.appForeground.opacity(0.6))
+                        .lineLimit(2)
                 }
-                Text(style.systemPrompt)
-                    .font(Font.appCaption)
-                    .foregroundStyle(Color.appForeground.opacity(0.6))
-                    .lineLimit(2)
             }
 
             Spacer()
@@ -139,7 +147,7 @@ private struct StyleRow: View {
             }
             .buttonStyle(.plain)
             .onHover { isEditHovered = $0 }
-            .help("Edit style")
+            .help("Edit provider")
 
             Button(action: { showDeleteConfirmation = true }) {
                 Image(systemName: "trash")
@@ -147,7 +155,7 @@ private struct StyleRow: View {
                     .foregroundStyle(Color.appError)
             }
             .buttonStyle(.plain)
-            .help("Delete style")
+            .help("Delete provider")
         }
         .padding(20)
         .background(
@@ -168,25 +176,25 @@ private struct StyleRow: View {
         .contentShape(Rectangle())
         .onHover { isRowHovered = $0 }
         .onTapGesture { onToggleActive() }
-        .confirmationDialog("Delete Style", isPresented: $showDeleteConfirmation) {
-            Button("Delete \"\(style.name)\"", role: .destructive, action: onDelete)
+        .confirmationDialog("Delete Provider", isPresented: $showDeleteConfirmation) {
+            Button("Delete \"\(providerLabel)\"", role: .destructive, action: onDelete)
         } message: {
-            Text("Are you sure you want to delete this style? This action cannot be undone.")
+            Text("Are you sure you want to delete this provider? This action cannot be undone.")
         }
     }
 }
 
-// MARK: - Style Form Sheet
+// MARK: - Provider Form Sheet
 
-private struct StyleFormSheet: View {
+private struct ProviderFormSheet: View {
     enum Mode: Identifiable {
         case create
-        case edit(Style)
+        case edit(LLMProviderConfig)
 
         var id: String {
             switch self {
             case .create: "create"
-            case .edit(let style): style.id.uuidString
+            case .edit(let config): config.id.uuidString
             }
         }
     }
@@ -195,24 +203,35 @@ private struct StyleFormSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
-    @State private var name: String = ""
-    @State private var systemPrompt: String = ""
+    @State private var providerType: LLMProviderType = .anthropic
+    @State private var apiKey: String = ""
+    @State private var endpointURL: String = ""
+    @State private var modelName: String = ""
 
     private var isEditing: Bool {
         if case .edit = mode { return true }
         return false
     }
 
+    private var isCloud: Bool {
+        providerType != .local
+    }
+
     private var isValid: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        && !systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if isCloud {
+            return !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !modelName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        } else {
+            return !endpointURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !modelName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
     }
 
     var body: some View {
         VStack(spacing: 0) {
             // Sheet header
             HStack {
-                Text(isEditing ? "Edit Style" : "New Style")
+                Text(isEditing ? "Edit Provider" : "New Provider")
                     .font(Font.appTitle3)
                     .fontWeight(.bold)
                     .foregroundStyle(Color.appForeground)
@@ -235,13 +254,49 @@ private struct StyleFormSheet: View {
             // Form body
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    // Name field
+                    // Provider type
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Name")
+                        Text("Provider Type")
                             .font(Font.appSubheadline)
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.appForeground.opacity(0.7))
-                        TextField("", text: $name)
+                        Picker("", selection: $providerType) {
+                            Text("Anthropic").tag(LLMProviderType.anthropic)
+                            Text("OpenAI").tag(LLMProviderType.openAI)
+                            Text("Local").tag(LLMProviderType.local)
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    // API Key (cloud only)
+                    if isCloud {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("API Key")
+                                .font(Font.appSubheadline)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.appForeground.opacity(0.7))
+                            SecureField("", text: $apiKey)
+                                .font(Font.appBody)
+                                .textFieldStyle(.plain)
+                                .foregroundStyle(Color.appForeground)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .background(Color.appForeground.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.appForeground.opacity(0.12), lineWidth: 1)
+                                )
+                        }
+                    }
+
+                    // Endpoint URL
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(isCloud ? "Endpoint URL (optional)" : "Endpoint URL")
+                            .font(Font.appSubheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.appForeground.opacity(0.7))
+                        TextField("", text: $endpointURL)
                             .font(Font.appBody)
                             .textFieldStyle(.plain)
                             .foregroundStyle(Color.appForeground)
@@ -255,17 +310,16 @@ private struct StyleFormSheet: View {
                             )
                     }
 
-                    // System prompt field
+                    // Model name
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("System Prompt")
+                        Text("Model Name")
                             .font(Font.appSubheadline)
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.appForeground.opacity(0.7))
-                        TextEditor(text: $systemPrompt)
+                        TextField("", text: $modelName)
                             .font(Font.appBody)
+                            .textFieldStyle(.plain)
                             .foregroundStyle(Color.appForeground)
-                            .scrollContentBackground(.hidden)
-                            .frame(minHeight: 140)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 10)
                             .background(Color.appForeground.opacity(0.06))
@@ -294,7 +348,7 @@ private struct StyleFormSheet: View {
 
                 Spacer()
 
-                Button(isEditing ? "Save" : "Create") { save() }
+                Button(isEditing ? "Save" : "Add") { save() }
                     .keyboardShortcut(.defaultAction)
                     .font(Font.appBody)
                     .fontWeight(.semibold)
@@ -312,24 +366,34 @@ private struct StyleFormSheet: View {
         .frame(width: 460)
         .background(Color.appBackground)
         .onAppear {
-            if case .edit(let style) = mode {
-                name = style.name
-                systemPrompt = style.systemPrompt
+            if case .edit(let config) = mode {
+                providerType = config.providerType
+                apiKey = config.apiKey
+                endpointURL = config.endpointURL
+                modelName = config.modelName
             }
         }
     }
 
     private func save() {
-        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedPrompt = systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedURL = endpointURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedModel = modelName.trimmingCharacters(in: .whitespacesAndNewlines)
 
         switch mode {
         case .create:
-            let style = Style(name: trimmedName, systemPrompt: trimmedPrompt)
-            modelContext.insert(style)
-        case .edit(let style):
-            style.name = trimmedName
-            style.systemPrompt = trimmedPrompt
+            let config = LLMProviderConfig(
+                providerType: providerType,
+                apiKey: trimmedKey,
+                endpointURL: trimmedURL,
+                modelName: trimmedModel
+            )
+            modelContext.insert(config)
+        case .edit(let config):
+            config.providerType = providerType
+            config.apiKey = trimmedKey
+            config.endpointURL = trimmedURL
+            config.modelName = trimmedModel
         }
         dismiss()
     }

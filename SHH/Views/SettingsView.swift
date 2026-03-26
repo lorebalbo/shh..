@@ -4,14 +4,10 @@ import ServiceManagement
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \LLMProviderConfig.modelName) private var providers: [LLMProviderConfig]
     @Query private var entries: [DictationEntry]
     @AppStorage("transcriptionLanguage") private var transcriptionLanguage = "auto"
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
-    @State private var showProviderSheet = false
-    @State private var editingProvider: LLMProviderConfig?
     @State private var showClearHistoryConfirmation = false
-    @State private var isAddProviderHovered = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -19,7 +15,6 @@ struct SettingsView: View {
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    llmProvidersSection
                     transcriptionSection
                     generalSection
                 }
@@ -27,12 +22,6 @@ struct SettingsView: View {
             }
         }
         .background(Color.appBackground)
-        .sheet(isPresented: $showProviderSheet) {
-            ProviderFormSheet(mode: .create)
-        }
-        .sheet(item: $editingProvider) { provider in
-            ProviderFormSheet(mode: .edit(provider))
-        }
     }
 
     // MARK: - Header
@@ -40,62 +29,13 @@ struct SettingsView: View {
     private var header: some View {
         HStack {
             Text("Settings")
-                .font(Font.appLargeTitle)
+                .font(Font.appTitle3)
                 .fontWeight(.bold)
                 .foregroundStyle(Color.appForeground)
             Spacer()
         }
         .padding(.horizontal, 24)
         .frame(height: 52)
-    }
-
-    // MARK: - LLM Providers Section
-
-    private var llmProvidersSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label("LLM Providers", systemImage: "brain")
-                    .font(Font.appHeadline)
-                    .foregroundStyle(Color.appForeground)
-                    Spacer()
-                    Button {
-                        showProviderSheet = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(Font.appTitle3)
-                            .frame(width: 28, height: 28)
-                            .background(isAddProviderHovered ? Color.appForeground.opacity(0.15) : Color.clear)
-                            .foregroundStyle(isAddProviderHovered ? Color.appError : Color.appForeground.opacity(0.8))
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                    }
-                    .buttonStyle(.plain)
-                    .onHover { isAddProviderHovered = $0 }
-                    .help("Add Provider")
-                }
-
-                if providers.isEmpty {
-                    Text("No providers configured. Add one to enable AI text processing.")
-                        .foregroundStyle(.secondary)
-                        .font(Font.appCallout)
-                        .padding(.vertical, 8)
-                } else {
-                    ForEach(providers) { provider in
-                        ProviderRow(
-                            provider: provider,
-                            onToggleActive: { toggleProviderActive(provider) },
-                            onEdit: { editingProvider = provider },
-                            onDelete: { deleteProvider(provider) }
-                        )
-                        if provider.id != providers.last?.id {
-                            Divider()
-                        }
-                    }
-            }
-        }
-        .padding(16)
-        .background(Color.appForeground.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.1), lineWidth: 1))
     }
 
     // MARK: - Transcription Section
@@ -106,13 +46,18 @@ struct SettingsView: View {
                 .font(Font.appHeadline)
                 .foregroundStyle(Color.appForeground)
 
-                Picker("Language", selection: $transcriptionLanguage) {
+                Picker(selection: $transcriptionLanguage) {
                     Text("Auto-detect").tag("auto")
                     Divider()
                     ForEach(TranscriptionLanguage.all, id: \.code) { lang in
                         Text(lang.name).tag(lang.code)
                     }
-            }
+                } label: {
+                    Text("Language")
+                        .font(Font.appBody)
+                        .foregroundStyle(Color.appForeground)
+                }
+                .tint(Color.appError)
             .frame(maxWidth: 300)
         }
         .padding(16)
@@ -130,6 +75,10 @@ struct SettingsView: View {
                 .foregroundStyle(Color.appForeground)
 
                 Toggle("Launch at Login", isOn: $launchAtLogin)
+                    .font(Font.appBody)
+                    .foregroundStyle(Color.appForeground)
+                    .toggleStyle(.switch)
+                    .tint(Color.appError)
                     .onChange(of: launchAtLogin) { _, newValue in
                         do {
                             if newValue {
@@ -147,15 +96,25 @@ struct SettingsView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Clear History")
+                            .font(Font.appBody)
                             .fontWeight(.medium)
+                            .foregroundStyle(Color.appForeground)
                         Text("\(entries.count) dictation\(entries.count == 1 ? "" : "s") stored")
                             .font(Font.appCaption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.appForeground.opacity(0.5))
                     }
                     Spacer()
-                    Button("Clear All", role: .destructive) {
-                        showClearHistoryConfirmation = true
+                    Button(action: { showClearHistoryConfirmation = true }) {
+                        Text("Clear All")
+                            .font(Font.appBody)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(entries.isEmpty ? Color.appForeground.opacity(0.12) : Color.appError)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
+                    .buttonStyle(.plain)
                     .disabled(entries.isEmpty)
                 }
             }
@@ -173,18 +132,6 @@ struct SettingsView: View {
     }
 
     // MARK: - Actions
-
-    private func toggleProviderActive(_ provider: LLMProviderConfig) {
-        if provider.isActive {
-            provider.isActive = false
-        } else {
-            try? provider.activate(in: modelContext)
-        }
-    }
-
-    private func deleteProvider(_ provider: LLMProviderConfig) {
-        modelContext.delete(provider)
-    }
 
     private func clearHistory() {
         for entry in entries {
@@ -216,192 +163,4 @@ private struct TranscriptionLanguage {
         .init(name: "Turkish", code: "tr"),
         .init(name: "Hindi", code: "hi"),
     ]
-}
-
-// MARK: - Provider Row
-
-private struct ProviderRow: View {
-    let provider: LLMProviderConfig
-    let onToggleActive: () -> Void
-    let onEdit: () -> Void
-    let onDelete: () -> Void
-    @State private var showDeleteConfirmation = false
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Button(action: onToggleActive) {
-                Image(systemName: provider.isActive ? "checkmark.circle.fill" : "circle")
-                    .font(Font.appTitle3)
-                    .foregroundStyle(provider.isActive ? Color.appError : .secondary)
-            }
-            .buttonStyle(.plain)
-            .help(provider.isActive ? "Deactivate provider" : "Activate provider")
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(providerLabel)
-                        .fontWeight(.medium)
-                    if provider.isActive {
-                        Text("Active")
-                            .font(Font.appCaption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .background(Color.appError.opacity(0.15))
-                            .foregroundStyle(Color.appError)
-                            .clipShape(Capsule())
-                    }
-                }
-                if !provider.modelName.isEmpty {
-                    Text("Model: \(provider.modelName)")
-                        .font(Font.appCaption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer()
-
-            Button(action: onEdit) {
-                Image(systemName: "pencil")
-            }
-            .buttonStyle(.borderless)
-            .help("Edit provider")
-
-            Button(action: { showDeleteConfirmation = true }) {
-                Image(systemName: "trash")
-                    .foregroundStyle(.red)
-            }
-            .buttonStyle(.borderless)
-            .help("Delete provider")
-        }
-        .confirmationDialog("Delete Provider", isPresented: $showDeleteConfirmation) {
-            Button("Delete Provider", role: .destructive, action: onDelete)
-        } message: {
-            Text("Are you sure you want to delete this provider? This action cannot be undone.")
-        }
-    }
-
-    private var providerLabel: String {
-        switch provider.providerType {
-        case .openAI: "OpenAI"
-        case .anthropic: "Anthropic"
-        case .local: "Local"
-        }
-    }
-}
-
-// MARK: - Provider Form Sheet
-
-private struct ProviderFormSheet: View {
-    enum Mode: Identifiable {
-        case create
-        case edit(LLMProviderConfig)
-
-        var id: String {
-            switch self {
-            case .create: "create"
-            case .edit(let config): config.id.uuidString
-            }
-        }
-    }
-
-    let mode: Mode
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
-
-    @State private var providerType: LLMProviderType = .anthropic
-    @State private var apiKey: String = ""
-    @State private var endpointURL: String = ""
-    @State private var modelName: String = ""
-
-    private var isEditing: Bool {
-        if case .edit = mode { return true }
-        return false
-    }
-
-    private var isCloud: Bool {
-        providerType != .local
-    }
-
-    private var isValid: Bool {
-        if isCloud {
-            return !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                && !modelName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        } else {
-            return !endpointURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                && !modelName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Text(isEditing ? "Edit Provider" : "Add Provider")
-                .font(Font.appHeadline)
-                .padding(.top, 16)
-
-            Form {
-                Picker("Provider Type", selection: $providerType) {
-                    Text("Anthropic").tag(LLMProviderType.anthropic)
-                    Text("OpenAI").tag(LLMProviderType.openAI)
-                    Text("Local").tag(LLMProviderType.local)
-                }
-
-                if isCloud {
-                    SecureField("API Key", text: $apiKey)
-                        .textFieldStyle(.roundedBorder)
-                    TextField("Endpoint URL (optional)", text: $endpointURL)
-                        .textFieldStyle(.roundedBorder)
-                } else {
-                    TextField("Endpoint URL", text: $endpointURL)
-                        .textFieldStyle(.roundedBorder)
-                }
-
-                TextField("Model Name", text: $modelName)
-                    .textFieldStyle(.roundedBorder)
-            }
-            .padding()
-
-            HStack {
-                Button("Cancel") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Spacer()
-                Button(isEditing ? "Save" : "Add") { save() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(!isValid)
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 16)
-        }
-        .frame(width: 420)
-        .onAppear {
-            if case .edit(let config) = mode {
-                providerType = config.providerType
-                apiKey = config.apiKey
-                endpointURL = config.endpointURL
-                modelName = config.modelName
-            }
-        }
-    }
-
-    private func save() {
-        let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedURL = endpointURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedModel = modelName.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        switch mode {
-        case .create:
-            let config = LLMProviderConfig(
-                providerType: providerType,
-                apiKey: trimmedKey,
-                endpointURL: trimmedURL,
-                modelName: trimmedModel
-            )
-            modelContext.insert(config)
-        case .edit(let config):
-            config.providerType = providerType
-            config.apiKey = trimmedKey
-            config.endpointURL = trimmedURL
-            config.modelName = trimmedModel
-        }
-        dismiss()
-    }
 }
