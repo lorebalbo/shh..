@@ -109,7 +109,6 @@ private struct ProviderRow: View {
     let onDelete: () -> Void
     @State private var showDeleteConfirmation = false
     @State private var isRowHovered = false
-    @State private var isEditHovered = false
 
     private var providerLabel: String {
         switch provider.providerType {
@@ -121,15 +120,23 @@ private struct ProviderRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: provider.isActive ? "checkmark.circle.fill" : "circle")
-                .font(Font.appTitle3)
-                .foregroundStyle(provider.isActive ? Color.appError : Color.appForeground.opacity(0.4))
-
             VStack(alignment: .leading, spacing: 2) {
-                Text(providerLabel)
-                    .font(Font.appBody)
-                    .fontWeight(.medium)
-                    .foregroundStyle(Color.appForeground)
+                HStack(spacing: 8) {
+                    Text(providerLabel)
+                        .font(Font.appBody)
+                        .fontWeight(.medium)
+                        .foregroundStyle(Color.appForeground)
+                    if provider.isActive {
+                        Text("Active")
+                            .font(Font.appCaption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(Color.appError)
+                            .clipShape(Capsule())
+                    }
+                }
                 if !provider.modelName.isEmpty {
                     Text(provider.modelName)
                         .font(Font.appCaption)
@@ -140,22 +147,13 @@ private struct ProviderRow: View {
 
             Spacer()
 
-            Button(action: { isEditHovered = false; onEdit() }) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(Font.appBody)
-                    .foregroundStyle(isEditHovered ? Color.appError : Color.appForeground.opacity(0.6))
-            }
-            .buttonStyle(.plain)
-            .onHover { isEditHovered = $0 }
-            .help("Edit provider")
-
-            Button(action: { showDeleteConfirmation = true }) {
-                Image(systemName: "trash")
-                    .font(Font.appBody)
-                    .foregroundStyle(Color.appError)
-            }
-            .buttonStyle(.plain)
-            .help("Delete provider")
+            Toggle("", isOn: Binding(
+                get: { provider.isActive },
+                set: { _ in onToggleActive() }
+            ))
+            .toggleStyle(.switch)
+            .tint(Color.appError)
+            .labelsHidden()
         }
         .padding(20)
         .background(
@@ -175,7 +173,14 @@ private struct ProviderRow: View {
         .padding(.vertical, 4)
         .contentShape(Rectangle())
         .onHover { isRowHovered = $0 }
-        .onTapGesture { onToggleActive() }
+        .onTapGesture { onEdit() }
+        .contextMenu {
+            Button(role: .destructive) {
+                showDeleteConfirmation = true
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
         .confirmationDialog("Delete Provider", isPresented: $showDeleteConfirmation) {
             Button("Delete \"\(providerLabel)\"", role: .destructive, action: onDelete)
         } message: {
@@ -207,6 +212,10 @@ private struct ProviderFormSheet: View {
     @State private var apiKey: String = ""
     @State private var endpointURL: String = ""
     @State private var modelName: String = ""
+    @State private var availableModels: [String] = []
+    @State private var isLoadingModels = false
+    @FocusState private var focusedField: ProviderField?
+    private enum ProviderField: Hashable { case apiKey, endpointURL, modelName }
 
     private var isEditing: Bool {
         if case .edit = mode { return true }
@@ -265,7 +274,8 @@ private struct ProviderFormSheet: View {
                             Text("OpenAI").tag(LLMProviderType.openAI)
                             Text("Local").tag(LLMProviderType.local)
                         }
-                        .pickerStyle(.segmented)
+                        .pickerStyle(.menu)
+                        .tint(Color.appError)
                     }
 
                     // API Key (cloud only)
@@ -276,6 +286,7 @@ private struct ProviderFormSheet: View {
                                 .fontWeight(.semibold)
                                 .foregroundStyle(Color.appForeground.opacity(0.7))
                             SecureField("", text: $apiKey)
+                                .focused($focusedField, equals: .apiKey)
                                 .font(Font.appBody)
                                 .textFieldStyle(.plain)
                                 .foregroundStyle(Color.appForeground)
@@ -297,6 +308,7 @@ private struct ProviderFormSheet: View {
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.appForeground.opacity(0.7))
                         TextField("", text: $endpointURL)
+                            .focused($focusedField, equals: .endpointURL)
                             .font(Font.appBody)
                             .textFieldStyle(.plain)
                             .foregroundStyle(Color.appForeground)
@@ -312,22 +324,59 @@ private struct ProviderFormSheet: View {
 
                     // Model name
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Model Name")
-                            .font(Font.appSubheadline)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(Color.appForeground.opacity(0.7))
-                        TextField("", text: $modelName)
-                            .font(Font.appBody)
-                            .textFieldStyle(.plain)
-                            .foregroundStyle(Color.appForeground)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .background(Color.appForeground.opacity(0.06))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.appForeground.opacity(0.12), lineWidth: 1)
-                            )
+                        HStack {
+                            Text("Model Name")
+                                .font(Font.appSubheadline)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.appForeground.opacity(0.7))
+                            Spacer()
+                            if providerType != .anthropic {
+                                Button {
+                                    Task { await fetchModels() }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        if isLoadingModels {
+                                            ProgressView()
+                                                .controlSize(.small)
+                                        } else {
+                                            Image(systemName: "arrow.clockwise")
+                                                .font(Font.appCaption)
+                                        }
+                                        Text("Fetch Models")
+                                            .font(Font.appCaption)
+                                    }
+                                    .foregroundStyle(Color.appError)
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(isLoadingModels)
+                            }
+                        }
+                        if !availableModels.isEmpty {
+                            Picker("", selection: $modelName) {
+                                if !modelName.isEmpty && !availableModels.contains(modelName) {
+                                    Text(modelName).tag(modelName)
+                                }
+                                ForEach(availableModels, id: \.self) { model in
+                                    Text(model).tag(model)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .tint(Color.appError)
+                        } else {
+                            TextField("", text: $modelName)
+                                .focused($focusedField, equals: .modelName)
+                                .font(Font.appBody)
+                                .textFieldStyle(.plain)
+                                .foregroundStyle(Color.appForeground)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .background(Color.appForeground.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.appForeground.opacity(0.12), lineWidth: 1)
+                                )
+                        }
                     }
                 }
                 .padding(24)
@@ -372,6 +421,67 @@ private struct ProviderFormSheet: View {
                 endpointURL = config.endpointURL
                 modelName = config.modelName
             }
+            if providerType == .anthropic {
+                availableModels = Self.anthropicModels
+                if modelName.isEmpty, let first = availableModels.first {
+                    modelName = first
+                }
+            }
+        }
+        .onChange(of: providerType) { _, newType in
+            if newType == .anthropic {
+                availableModels = Self.anthropicModels
+                modelName = availableModels.first ?? ""
+            } else {
+                availableModels = []
+                modelName = ""
+            }
+        }
+    }
+
+    private static let anthropicModels = [
+        "claude-sonnet-4-20250514",
+        "claude-3-5-haiku-20241022",
+        "claude-3-opus-20240229"
+    ]
+
+    private func fetchModels() async {
+        isLoadingModels = true
+        defer { isLoadingModels = false }
+
+        let baseURL: String
+        switch providerType {
+        case .openAI:
+            baseURL = endpointURL.isEmpty ? "https://api.openai.com" : endpointURL
+        case .local:
+            baseURL = endpointURL.isEmpty ? "http://localhost:1234" : endpointURL
+        case .anthropic:
+            return
+        }
+
+        let urlString = baseURL.hasSuffix("/") ? "\(baseURL)v1/models" : "\(baseURL)/v1/models"
+        guard let url = URL(string: urlString) else { return }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        if !apiKey.isEmpty {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
+
+        struct ModelsResponse: Decodable {
+            struct Model: Decodable { let id: String }
+            let data: [Model]
+        }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(for: request)
+            let response = try JSONDecoder().decode(ModelsResponse.self, from: data)
+            availableModels = response.data.map(\.id).sorted()
+            if !availableModels.isEmpty && !availableModels.contains(modelName) {
+                modelName = availableModels[0]
+            }
+        } catch {
+            availableModels = []
         }
     }
 

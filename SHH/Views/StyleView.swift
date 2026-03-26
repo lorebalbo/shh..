@@ -109,20 +109,25 @@ private struct StyleRow: View {
     let onDelete: () -> Void
     @State private var showDeleteConfirmation = false
     @State private var isRowHovered = false
-    @State private var isEditHovered = false
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: style.isActive ? "checkmark.circle.fill" : "circle")
-                .font(Font.appTitle3)
-                .foregroundStyle(style.isActive ? Color.appError : Color.appForeground.opacity(0.4))
-
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Text(style.name)
                         .font(Font.appBody)
                         .fontWeight(.medium)
                         .foregroundStyle(Color.appForeground)
+                    if style.isActive {
+                        Text("Active")
+                            .font(Font.appCaption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(Color.appError)
+                            .clipShape(Capsule())
+                    }
                 }
                 Text(style.systemPrompt)
                     .font(Font.appCaption)
@@ -132,22 +137,13 @@ private struct StyleRow: View {
 
             Spacer()
 
-            Button(action: { isEditHovered = false; onEdit() }) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(Font.appBody)
-                    .foregroundStyle(isEditHovered ? Color.appError : Color.appForeground.opacity(0.6))
-            }
-            .buttonStyle(.plain)
-            .onHover { isEditHovered = $0 }
-            .help("Edit style")
-
-            Button(action: { showDeleteConfirmation = true }) {
-                Image(systemName: "trash")
-                    .font(Font.appBody)
-                    .foregroundStyle(Color.appError)
-            }
-            .buttonStyle(.plain)
-            .help("Delete style")
+            Toggle("", isOn: Binding(
+                get: { style.isActive },
+                set: { _ in onToggleActive() }
+            ))
+            .toggleStyle(.switch)
+            .tint(Color.appError)
+            .labelsHidden()
         }
         .padding(20)
         .background(
@@ -167,7 +163,14 @@ private struct StyleRow: View {
         .padding(.vertical, 4)
         .contentShape(Rectangle())
         .onHover { isRowHovered = $0 }
-        .onTapGesture { onToggleActive() }
+        .onTapGesture { onEdit() }
+        .contextMenu {
+            Button(role: .destructive) {
+                showDeleteConfirmation = true
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
         .confirmationDialog("Delete Style", isPresented: $showDeleteConfirmation) {
             Button("Delete \"\(style.name)\"", role: .destructive, action: onDelete)
         } message: {
@@ -197,6 +200,8 @@ private struct StyleFormSheet: View {
 
     @State private var name: String = ""
     @State private var systemPrompt: String = ""
+    @FocusState private var focusedField: StyleField?
+    private enum StyleField: Hashable { case name, systemPrompt }
 
     private var isEditing: Bool {
         if case .edit = mode { return true }
@@ -242,6 +247,7 @@ private struct StyleFormSheet: View {
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.appForeground.opacity(0.7))
                         TextField("", text: $name)
+                            .focused($focusedField, equals: .name)
                             .font(Font.appBody)
                             .textFieldStyle(.plain)
                             .foregroundStyle(Color.appForeground)
@@ -262,6 +268,7 @@ private struct StyleFormSheet: View {
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.appForeground.opacity(0.7))
                         TextEditor(text: $systemPrompt)
+                            .focused($focusedField, equals: .systemPrompt)
                             .font(Font.appBody)
                             .foregroundStyle(Color.appForeground)
                             .scrollContentBackground(.hidden)

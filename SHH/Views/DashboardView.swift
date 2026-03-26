@@ -122,11 +122,11 @@ private struct SidebarView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header: Logo & Title + Collapse Toggle
-            ZStack {
+            HStack(spacing: 0) {
                 if !collapsed {
                     HStack(spacing: 8) {
                         Image(systemName: "waveform")
-                            .font(Font.appTitle2)
+                            .font(Font.appTitle3)
                             .frame(width: 24, alignment: .center)
                         Text("Shh...")
                             .font(Font.appTitle3)
@@ -135,25 +135,23 @@ private struct SidebarView: View {
                     }
                     .foregroundStyle(Color.appForeground)
                     .padding(.leading, 20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                     .transition(.opacity)
                 }
 
-                HStack {
-                    Spacer(minLength: 0)
-                    Button {
-                        withAnimation(.spring(duration: 0.3)) {
-                            collapsed.toggle()
-                        }
-                    } label: {
-                        Image(systemName: collapsed ? "sidebar.right" : "sidebar.left")
-                            .font(Font.appTitle2)
-                            .foregroundStyle(Color.appForeground.opacity(0.8))
-                            .frame(width: 44, height: 44)
+                Spacer(minLength: 0)
+
+                Button {
+                    withAnimation(.spring(duration: 0.3)) {
+                        collapsed.toggle()
                     }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, 10)
+                } label: {
+                    Image(systemName: collapsed ? "sidebar.right" : "sidebar.left")
+                        .font(Font.appTitle3)
+                        .foregroundStyle(Color.appForeground.opacity(0.8))
+                        .frame(width: 44, height: 44)
                 }
+                .buttonStyle(.plain)
+                .padding(.trailing, 10)
             }
             .frame(height: 52)
 

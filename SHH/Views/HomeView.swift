@@ -6,7 +6,6 @@ import AVFoundation
 struct HomeView: View {
     @Query(sort: \DictationEntry.timestamp, order: .reverse) private var entries: [DictationEntry]
     @State private var searchText = ""
-    @State private var expandedEntryID: UUID?
     @AppStorage("showDiagnostics") private var showDiagnostics = false
 
     private var filteredEntries: [DictationEntry] {
@@ -22,8 +21,6 @@ struct HomeView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            diagnosticPanel
-            Divider()
             if filteredEntries.isEmpty {
                 emptyState
             } else {
@@ -36,15 +33,36 @@ struct HomeView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack {
+        HStack(spacing: 12) {
             Text("Home")
                 .font(Font.appTitle3)
                 .fontWeight(.bold)
                 .foregroundStyle(Color.appForeground)
             Spacer()
-            Text("\(entries.count) dictation\(entries.count == 1 ? "" : "s")")
-                .foregroundStyle(Color.appForeground.opacity(0.5))
-                .font(Font.appCallout)
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(Font.appCaption)
+                    .foregroundStyle(Color.appForeground.opacity(0.4))
+                TextField("Search dictations", text: $searchText)
+                    .font(Font.appCallout)
+                    .textFieldStyle(.plain)
+                    .foregroundStyle(Color.appForeground)
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(Font.appCaption)
+                            .foregroundStyle(Color.appForeground.opacity(0.4))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.appForeground.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .frame(maxWidth: 220)
         }
         .padding(.horizontal, 24)
         .frame(height: 52)
@@ -152,23 +170,16 @@ struct HomeView: View {
     // MARK: - Entry List
 
     private var entryList: some View {
-        List {
-            ForEach(filteredEntries) { entry in
-                DictationEntryRow(
-                    entry: entry,
-                    isExpanded: expandedEntryID == entry.id,
-                    onToggle: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            expandedEntryID = (expandedEntryID == entry.id) ? nil : entry.id
-                        }
-                    }
-                )
+        ScrollView {
+            LazyVStack(spacing: 10) {
+                ForEach(filteredEntries) { entry in
+                    DictationEntryRow(entry: entry)
+                }
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
         }
-        .listStyle(.inset)
-        .scrollContentBackground(.hidden)
         .background(Color.appBackground)
-        .searchable(text: $searchText, prompt: Text("Search dictations").foregroundStyle(Color.appForeground.opacity(0.4)))
     }
 }
 
@@ -176,101 +187,162 @@ struct HomeView: View {
 
 private struct DictationEntryRow: View {
     let entry: DictationEntry
-    let isExpanded: Bool
-    let onToggle: () -> Void
-    @State private var selectedTab: EntryTab = .processed
+    @State private var showingRaw: Bool = false
+    @State private var copied: Bool = false
+    @State private var isHovered: Bool = false
+    @Environment(\.modelContext) private var modelContext
 
-    private enum EntryTab: String, CaseIterable {
-        case processed = "Processed"
-        case raw = "Original"
+    private let sideWidth: CGFloat = 120
+
+    private var displayedText: String {
+        showingRaw ? entry.rawText : (entry.processedText ?? entry.rawText)
+    }
+
+    private var hasProcessed: Bool {
+        entry.processedText != nil
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // Header
-            HStack(alignment: .center) {
-                // Clickable left side
-                Button(action: onToggle) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(entry.timestamp, style: .date)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            + Text("  ")
-                            + Text(entry.timestamp, style: .time)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+        HStack(alignment: .center, spacing: 12) {
+            // Left: date and time, one line, right-aligned
+            HStack(spacing: 4) {
+                Text(entry.timestamp, format: .dateTime.month(.abbreviated).day())
+                Text(entry.timestamp, format: .dateTime.hour().minute())
+            }
+            .font(.caption)
+            .foregroundStyle(Color.appForeground.opacity(0.45))
+            .lineLimit(1)
+            .frame(width: sideWidth, alignment: .trailing)
 
-                // Controls (Visible when expanded)
-                if isExpanded {
-                    HStack(spacing: 12) {
-                        if entry.processedText != nil {
-                            Picker("View", selection: $selectedTab) {
-                                Image(systemName: "wand.and.stars").tag(EntryTab.processed)
-                                Image(systemName: "text.alignleft").tag(EntryTab.raw)
-                            }
-                            .pickerStyle(.segmented)
-                            .labelsHidden()
-                            .controlSize(.small)
-                            .fixedSize()
-                            .help("Toggle Processed / Original")
-                        }
+            // Center: the card
+            card.frame(maxWidth: 500)
 
-                        Button {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(textForTab, forType: .string)
-                        } label: {
-                            Image(systemName: "doc.on.doc")
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
-                        .help("Copy Text")
+            // Right: "Copied" indicator, symmetric width to keep card centered
+            ZStack(alignment: .leading) {
+                if copied {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption)
+                        Text("Copied")
+                            .font(.caption2)
                     }
+                    .foregroundStyle(Color.appError)
                     .transition(.opacity)
                 }
-
-                // Clickable right chevron
-                Button(action: onToggle) {
-                    Image(systemName: "chevron.right")
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                        .foregroundStyle(.secondary)
-                        .animation(.easeInOut(duration: 0.2), value: isExpanded)
-                        .padding(.leading, 8)
-                }
-                .buttonStyle(.plain)
             }
-            .padding(.bottom, 6)
-
-            // Text Content
-            Text(textForTab)
-                .lineLimit(isExpanded ? nil : 2)
-                .font(.body)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(width: sideWidth, alignment: .leading)
         }
-        .padding(12)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-        )
-        .listRowSeparator(.hidden)
-        .padding(.vertical, 2)
     }
 
-    private var textForTab: String {
-        switch selectedTab {
-        case .raw:
-            return entry.rawText
-        case .processed:
-            return entry.processedText ?? entry.rawText
+    private var card: some View {
+        HStack(spacing: 0) {
+            // Text area — clicking copies
+            Button(action: copyText) {
+                Text(displayedText)
+                    .font(.body)
+                    .foregroundStyle(Color.appForeground)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(12)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            // Vertical divider
+            Rectangle()
+                .fill(Color.appForeground.opacity(0.12))
+                .frame(width: 1)
+                .padding(.vertical, 8)
+
+            // Icon controls
+            VStack(spacing: 0) {
+                // Processed / wand
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) { showingRaw = false }
+                } label: {
+                    Image(systemName: "wand.and.stars")
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundStyle(!showingRaw && hasProcessed
+                            ? Color.appError
+                            : Color.appForeground.opacity(0.35))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Show Processed Text")
+
+                Rectangle()
+                    .fill(Color.appForeground.opacity(0.12))
+                    .frame(height: 1)
+                    .padding(.horizontal, 8)
+
+                // Raw / original text
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) { showingRaw = true }
+                } label: {
+                    Image(systemName: "text.alignleft")
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundStyle(showingRaw || !hasProcessed
+                            ? Color.appError
+                            : Color.appForeground.opacity(0.35))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Show Original Text")
+
+                Rectangle()
+                    .fill(Color.appForeground.opacity(0.12))
+                    .frame(height: 1)
+                    .padding(.horizontal, 8)
+
+                // Delete
+                Button(action: deleteEntry) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundStyle(Color.appForeground.opacity(0.35))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Delete Entry")
+            }
+            .frame(width: 56)
+            .padding(.vertical, 8)
         }
+        .frame(minHeight: 96)
+        .background(
+            isHovered
+                ? Color(NSColor.controlBackgroundColor).opacity(0.75)
+                : Color(NSColor.controlBackgroundColor).opacity(0.5)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(
+                    isHovered
+                        ? Color.appForeground.opacity(0.25)
+                        : Color.appForeground.opacity(0.12),
+                    lineWidth: 1
+                )
+        )
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
+    }
+
+    private func copyText() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(displayedText, forType: .string)
+        withAnimation(.easeInOut(duration: 0.15)) { copied = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation(.easeInOut(duration: 0.3)) { copied = false }
+        }
+    }
+
+    private func deleteEntry() {
+        modelContext.delete(entry)
     }
 }
