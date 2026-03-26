@@ -190,6 +190,9 @@ private struct DictationEntryRow: View {
     @State private var showingRaw: Bool = false
     @State private var copied: Bool = false
     @State private var isHovered: Bool = false
+    @State private var isWandHovered = false
+    @State private var isRawHovered = false
+    @State private var isTrashHovered = false
     @Environment(\.modelContext) private var modelContext
 
     private let sideWidth: CGFloat = 120
@@ -262,13 +265,14 @@ private struct DictationEntryRow: View {
                 } label: {
                     Image(systemName: "wand.and.stars")
                         .font(.system(size: 15, weight: .regular))
-                        .foregroundStyle(!showingRaw && hasProcessed
+                        .foregroundStyle(!showingRaw && hasProcessed || isWandHovered
                             ? Color.appError
                             : Color.appForeground.opacity(0.35))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .onHover { isWandHovered = $0 }
                 .help("Show Processed Text")
 
                 Rectangle()
@@ -282,13 +286,14 @@ private struct DictationEntryRow: View {
                 } label: {
                     Image(systemName: "text.alignleft")
                         .font(.system(size: 15, weight: .regular))
-                        .foregroundStyle(showingRaw || !hasProcessed
+                        .foregroundStyle(showingRaw || !hasProcessed || isRawHovered
                             ? Color.appError
                             : Color.appForeground.opacity(0.35))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .onHover { isRawHovered = $0 }
                 .help("Show Original Text")
 
                 Rectangle()
@@ -300,17 +305,18 @@ private struct DictationEntryRow: View {
                 Button(action: deleteEntry) {
                     Image(systemName: "trash")
                         .font(.system(size: 15, weight: .regular))
-                        .foregroundStyle(Color.appForeground.opacity(0.35))
+                        .foregroundStyle(isTrashHovered ? Color.appError : Color.appForeground.opacity(0.35))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .onHover { isTrashHovered = $0 }
                 .help("Delete Entry")
             }
             .frame(width: 56)
             .padding(.vertical, 8)
         }
-        .frame(minHeight: 96)
+        .frame(minHeight: 122)
         .background(
             isHovered
                 ? Color(NSColor.controlBackgroundColor).opacity(0.75)

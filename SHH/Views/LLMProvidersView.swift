@@ -170,7 +170,7 @@ private struct ProviderRow: View {
                  )
         )
         .listRowSeparator(.hidden)
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
         .contentShape(Rectangle())
         .onHover { isRowHovered = $0 }
         .onTapGesture { onEdit() }
