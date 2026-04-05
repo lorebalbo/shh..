@@ -8,7 +8,7 @@ enum RecordingMode {
 }
 
 /// Enum-based state machine managing recording mode transitions driven by
-/// Fn key and Space key events from GlobalInputManager.
+/// Fn key, Space key, and Escape key events from GlobalInputManager.
 ///
 /// States: idle, pushToTalkActive, continuousActive, lockInActive.
 ///
@@ -18,6 +18,7 @@ enum RecordingMode {
 /// - pushToTalkActive + Space press → lockInActive (Lock-in activated)
 /// - continuousActive + Fn press → idle (stop recording)
 /// - lockInActive + Fn press → idle (stop recording)
+/// - any active + Esc press → idle (cancel recording)
 ///
 /// Double-tap detection: two Fn presses within 300ms enter continuousActive.
 final class RecordingStateMachine {
@@ -44,6 +45,10 @@ final class RecordingStateMachine {
     /// The parameter indicates which recording mode was active.
     var onRecordingDidStop: ((RecordingMode) -> Void)?
 
+    /// Called when recording is cancelled (e.g. via Escape key).
+    /// The audio buffer should be discarded without transcription.
+    var onRecordingDidCancel: (() -> Void)?
+
     /// Called when the state machine is force-reset to idle (e.g. hardware error,
     /// audio engine failure). No recording mode is available; callers should treat
     /// this as an abrupt stop without transcription.
@@ -51,7 +56,9 @@ final class RecordingStateMachine {
 
     // MARK: - Event Handlers
 
-    func handleFnPress() {
+    /// Returns `true` if the event was consumed and should be suppressed.
+    @discardableResult
+    func handleFnPress() -> Bool {
         switch state {
         case .idle:
             let now = CFAbsoluteTimeGetCurrent()
@@ -66,46 +73,74 @@ final class RecordingStateMachine {
                 state = .pushToTalkActive
             }
             onRecordingDidStart?()
+            return true
 
         case .continuousActive:
             // Single press stops Continuous recording
             lastFnPressTime = 0
             state = .idle
             onRecordingDidStop?(.continuous)
+            return true
 
         case .lockInActive:
             // Single press stops Lock-in recording
             lastFnPressTime = 0
             state = .idle
             onRecordingDidStop?(.lockIn)
+            return true
 
         case .pushToTalkActive:
             // Already in PTT — ignore redundant press
-            break
+            return true
         }
     }
 
-    func handleFnRelease() {
+    /// Returns `true` if the event was consumed and should be suppressed.
+    @discardableResult
+    func handleFnRelease() -> Bool {
         switch state {
         case .pushToTalkActive:
             // Release in PTT → stop recording
             state = .idle
             onRecordingDidStop?(.pushToTalk)
+            return true
 
-        default:
-            // Release is irrelevant in continuous, lockIn, or idle
-            break
+        case .continuousActive, .lockInActive:
+            // Fn release while in continuous/lockIn — no state change but
+            // suppress the event to prevent macOS emoji picker detection
+            return true
+
+        case .idle:
+            return false
         }
     }
 
-    func handleSpacePress() {
+    /// Returns `true` if the event was consumed and should be suppressed.
+    @discardableResult
+    func handleSpacePress() -> Bool {
         switch state {
         case .pushToTalkActive:
             // Fn held + Space → Lock-in mode (recording continues)
             state = .lockInActive
+            return true
 
         default:
-            break
+            return false
+        }
+    }
+
+    /// Returns `true` if the event was consumed and should be suppressed.
+    @discardableResult
+    func handleEscPress() -> Bool {
+        switch state {
+        case .pushToTalkActive, .continuousActive, .lockInActive:
+            lastFnPressTime = 0
+            state = .idle
+            onRecordingDidCancel?()
+            return true
+
+        case .idle:
+            return false
         }
     }
 

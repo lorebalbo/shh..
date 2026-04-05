@@ -15,6 +15,7 @@ struct MenuBarView: View {
         Divider()
 
         Toggle("Launch at Login", isOn: $launchAtLogin)
+            .tint(Color.appError)
             .onChange(of: launchAtLogin) { _, newValue in
                 do {
                     if newValue {

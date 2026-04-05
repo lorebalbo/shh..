@@ -40,7 +40,7 @@ struct StyleView: View {
                 showCreateSheet = true
             } label: {
                 Image(systemName: "plus.circle")
-                    .font(Font.appTitle3)
+                    .font(Font.appBody)
                     .foregroundStyle(isAddHovered ? Color.appError : Color.appForeground.opacity(0.8))
             }
             .buttonStyle(.plain)
@@ -54,17 +54,21 @@ struct StyleView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        ContentUnavailableView {
-            Label("No Styles", systemImage: "paintbrush")
-        } description: {
+        VStack(spacing: 12) {
+            Image(systemName: "paintbrush")
+                .font(.system(size: 36))
+                .foregroundStyle(Color.appForeground.opacity(0.25))
+            Text("No Styles")
+                .font(Font.appTitle3)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.appForeground)
             Text("Create a style to transform your dictated text with AI.")
-        } actions: {
-            Button("Create Style") {
-                showCreateSheet = true
-            }
-            .buttonStyle(.borderedProminent)
+                .font(Font.appBody)
+                .foregroundStyle(Color.appForeground.opacity(0.45))
+                .multilineTextAlignment(.center)
         }
-        .frame(maxHeight: .infinity)
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - List
@@ -141,8 +145,7 @@ private struct StyleRow: View {
                 get: { style.isActive },
                 set: { _ in onToggleActive() }
             ))
-            .toggleStyle(.switch)
-            .tint(Color.appError)
+            .toggleStyle(AppToggleStyle())
             .labelsHidden()
         }
         .padding(20)

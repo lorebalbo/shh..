@@ -40,7 +40,7 @@ struct LLMProvidersView: View {
                 showCreateSheet = true
             } label: {
                 Image(systemName: "plus.circle")
-                    .font(Font.appTitle3)
+                    .font(Font.appBody)
                     .foregroundStyle(isAddHovered ? Color.appError : Color.appForeground.opacity(0.8))
             }
             .buttonStyle(.plain)
@@ -54,17 +54,21 @@ struct LLMProvidersView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        ContentUnavailableView {
-            Label("No Providers", systemImage: "brain")
-        } description: {
+        VStack(spacing: 12) {
+            Image(systemName: "brain")
+                .font(.system(size: 36))
+                .foregroundStyle(Color.appForeground.opacity(0.25))
+            Text("No Providers")
+                .font(Font.appTitle3)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.appForeground)
             Text("Add an LLM provider to enable AI-powered text processing.")
-        } actions: {
-            Button("Add Provider") {
-                showCreateSheet = true
-            }
-            .buttonStyle(.borderedProminent)
+                .font(Font.appBody)
+                .foregroundStyle(Color.appForeground.opacity(0.45))
+                .multilineTextAlignment(.center)
         }
-        .frame(maxHeight: .infinity)
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - List
@@ -151,8 +155,7 @@ private struct ProviderRow: View {
                 get: { provider.isActive },
                 set: { _ in onToggleActive() }
             ))
-            .toggleStyle(.switch)
-            .tint(Color.appError)
+            .toggleStyle(AppToggleStyle())
             .labelsHidden()
         }
         .padding(20)
@@ -226,6 +229,14 @@ private struct ProviderFormSheet: View {
         providerType != .local
     }
 
+    private var providerTypeLabel: String {
+        switch providerType {
+        case .anthropic: "Anthropic"
+        case .openAI: "OpenAI"
+        case .local: "Local"
+        }
+    }
+
     private var isValid: Bool {
         if isCloud {
             return !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -269,13 +280,30 @@ private struct ProviderFormSheet: View {
                             .font(Font.appSubheadline)
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.appForeground.opacity(0.7))
-                        Picker("", selection: $providerType) {
-                            Text("Anthropic").tag(LLMProviderType.anthropic)
-                            Text("OpenAI").tag(LLMProviderType.openAI)
-                            Text("Local").tag(LLMProviderType.local)
+                        Menu {
+                            Button("Anthropic") { providerType = .anthropic }
+                            Button("OpenAI") { providerType = .openAI }
+                            Button("Local") { providerType = .local }
+                        } label: {
+                            HStack {
+                                Text(providerTypeLabel)
+                                    .font(Font.appBody)
+                                    .foregroundStyle(Color.appForeground)
+                                Spacer()
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(Font.appCaption)
+                                    .foregroundStyle(Color.appForeground.opacity(0.5))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.appForeground.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.12), lineWidth: 1))
                         }
-                        .pickerStyle(.menu)
-                        .tint(Color.appError)
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                        .frame(maxWidth: .infinity)
                     }
 
                     // API Key (cloud only)
@@ -352,16 +380,33 @@ private struct ProviderFormSheet: View {
                             }
                         }
                         if !availableModels.isEmpty {
-                            Picker("", selection: $modelName) {
+                            Menu {
                                 if !modelName.isEmpty && !availableModels.contains(modelName) {
-                                    Text(modelName).tag(modelName)
+                                    Button(modelName) { }
                                 }
                                 ForEach(availableModels, id: \.self) { model in
-                                    Text(model).tag(model)
+                                    Button(model) { modelName = model }
                                 }
+                            } label: {
+                                HStack {
+                                    Text(modelName.isEmpty ? "Select a model" : modelName)
+                                        .font(Font.appBody)
+                                        .foregroundStyle(modelName.isEmpty ? Color.appForeground.opacity(0.4) : Color.appForeground)
+                                    Spacer()
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(Font.appCaption)
+                                        .foregroundStyle(Color.appForeground.opacity(0.5))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color.appForeground.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.12), lineWidth: 1))
                             }
-                            .pickerStyle(.menu)
-                            .tint(Color.appError)
+                            .menuStyle(.borderlessButton)
+                            .menuIndicator(.hidden)
+                            .frame(maxWidth: .infinity)
                         } else {
                             TextField("", text: $modelName)
                                 .focused($focusedField, equals: .modelName)

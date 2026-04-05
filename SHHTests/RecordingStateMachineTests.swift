@@ -9,6 +9,7 @@ final class RecordingStateMachineTests: XCTestCase {
     private var didStopMode: RecordingMode?
     private var startCount: Int = 0
     private var stopCount: Int = 0
+    private var cancelCount: Int = 0
 
     override func setUp() {
         super.setUp()
@@ -17,6 +18,7 @@ final class RecordingStateMachineTests: XCTestCase {
         didStopMode = nil
         startCount = 0
         stopCount = 0
+        cancelCount = 0
 
         sm.onRecordingDidStart = { [unowned self] in
             self.didStart = true
@@ -25,6 +27,9 @@ final class RecordingStateMachineTests: XCTestCase {
         sm.onRecordingDidStop = { [unowned self] mode in
             self.didStopMode = mode
             self.stopCount += 1
+        }
+        sm.onRecordingDidCancel = { [unowned self] in
+            self.cancelCount += 1
         }
     }
 
@@ -426,6 +431,83 @@ final class RecordingStateMachineTests: XCTestCase {
         sm.handleFnPress()
         XCTAssertEqual(sm.state, .pushToTalkActive, "Should remain in PTT")
         XCTAssertEqual(startCount, 1, "Should not fire start again")
+    }
+
+    // MARK: - Event suppression return values
+
+    func testHandleFnPress_returnsTrue_whenConsumed() {
+        XCTAssertTrue(sm.handleFnPress(), "Fn press from idle should be consumed")
+    }
+
+    func testHandleFnRelease_returnsFalse_inIdle() {
+        XCTAssertFalse(sm.handleFnRelease(), "Fn release in idle should not be consumed")
+    }
+
+    func testHandleFnRelease_returnsTrue_inActiveStates() {
+        sm.handleFnPress()
+        XCTAssertTrue(sm.handleFnRelease(), "Fn release in PTT should be consumed")
+    }
+
+    func testHandleSpacePress_returnsFalse_inIdle() {
+        XCTAssertFalse(sm.handleSpacePress(), "Space in idle should not be consumed")
+    }
+
+    func testHandleSpacePress_returnsTrue_inPTT() {
+        sm.handleFnPress()
+        XCTAssertTrue(sm.handleSpacePress(), "Space in PTT should be consumed")
+    }
+
+    // MARK: - Escape cancellation
+
+    func testEscPress_inIdle_doesNothing() {
+        XCTAssertFalse(sm.handleEscPress(), "Esc in idle should not be consumed")
+        XCTAssertEqual(sm.state, .idle)
+        XCTAssertEqual(cancelCount, 0)
+    }
+
+    func testEscPress_cancelsPushToTalk() {
+        sm.handleFnPress()
+        XCTAssertEqual(sm.state, .pushToTalkActive)
+
+        XCTAssertTrue(sm.handleEscPress(), "Esc should be consumed")
+        XCTAssertEqual(sm.state, .idle)
+        XCTAssertEqual(cancelCount, 1)
+        XCTAssertEqual(stopCount, 0, "Cancel should not fire onRecordingDidStop")
+    }
+
+    func testEscPress_cancelsContinuousMode() {
+        sm.handleFnPress()
+        sm.handleFnRelease()
+        Thread.sleep(forTimeInterval: 0.01)
+        sm.handleFnPress()
+        XCTAssertEqual(sm.state, .continuousActive)
+
+        XCTAssertTrue(sm.handleEscPress(), "Esc should be consumed")
+        XCTAssertEqual(sm.state, .idle)
+        XCTAssertEqual(cancelCount, 1)
+    }
+
+    func testEscPress_cancelsLockInMode() {
+        sm.handleFnPress()
+        sm.handleSpacePress()
+        XCTAssertEqual(sm.state, .lockInActive)
+
+        XCTAssertTrue(sm.handleEscPress(), "Esc should be consumed")
+        XCTAssertEqual(sm.state, .idle)
+        XCTAssertEqual(cancelCount, 1)
+        XCTAssertEqual(stopCount, 0, "Cancel should not fire onRecordingDidStop")
+    }
+
+    func testEscPress_resetsDoubleTapTimer() {
+        sm.handleFnPress()
+        sm.handleEscPress()
+        XCTAssertEqual(sm.state, .idle)
+
+        // Next press should NOT be double-tap
+        Thread.sleep(forTimeInterval: 0.01)
+        sm.handleFnPress()
+        XCTAssertEqual(sm.state, .pushToTalkActive,
+            "After Esc cancel, next press should be PTT, not double-tap")
     }
 
     func testStoppingContinuous_resetsLastFnPressTime() {

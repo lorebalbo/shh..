@@ -84,13 +84,16 @@ final class RecordingCoordinator {
     private func setupBindings() {
         // Wire input events → state machine
         inputManager.onFnPress = { [weak self] in
-            self?.stateMachine.handleFnPress()
+            self?.stateMachine.handleFnPress() ?? false
         }
         inputManager.onFnRelease = { [weak self] in
-            self?.stateMachine.handleFnRelease()
+            self?.stateMachine.handleFnRelease() ?? false
         }
         inputManager.onSpacePress = { [weak self] in
-            self?.stateMachine.handleSpacePress()
+            self?.stateMachine.handleSpacePress() ?? false
+        }
+        inputManager.onEscPress = { [weak self] in
+            self?.stateMachine.handleEscPress() ?? false
         }
 
         // Wire state machine → audio capture + transcription pipeline
@@ -123,6 +126,13 @@ final class RecordingCoordinator {
 
             PipelineEventLog.shared.append("🔄 Transcribing…")
             self.processTranscription(audioBuffer: audioBuffer, mode: mode)
+        }
+
+        stateMachine.onRecordingDidCancel = { [weak self] in
+            guard let self else { return }
+            _ = self.audioCaptureManager.stopRecording()
+            self.logger.info("Recording cancelled")
+            PipelineEventLog.shared.append("🚫 Recording cancelled")
         }
 
         // Handle audio interruptions (e.g. microphone disconnect mid-recording)

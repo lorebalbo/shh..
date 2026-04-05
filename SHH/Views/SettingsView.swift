@@ -40,25 +40,46 @@ struct SettingsView: View {
 
     // MARK: - Transcription Section
 
+    private var currentLanguageLabel: String {
+        if transcriptionLanguage == "auto" { return "Auto-detect" }
+        return TranscriptionLanguage.all.first { $0.code == transcriptionLanguage }?.name ?? transcriptionLanguage
+    }
+
     private var transcriptionSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             Label("Transcription", systemImage: "waveform")
                 .font(Font.appHeadline)
                 .foregroundStyle(Color.appForeground)
 
-                Picker(selection: $transcriptionLanguage) {
-                    Text("Auto-detect").tag("auto")
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Language")
+                    .font(Font.appSubheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.appForeground.opacity(0.7))
+                Menu {
+                    Button("Auto-detect") { transcriptionLanguage = "auto" }
                     Divider()
                     ForEach(TranscriptionLanguage.all, id: \.code) { lang in
-                        Text(lang.name).tag(lang.code)
+                        Button(lang.name) { transcriptionLanguage = lang.code }
                     }
                 } label: {
-                    Text("Language")
-                        .font(Font.appBody)
-                        .foregroundStyle(Color.appForeground)
+                    HStack {
+                        Text(currentLanguageLabel)
+                            .font(Font.appBody)
+                            .foregroundStyle(Color.appForeground)
+                        Spacer()
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(Font.appCaption)
+                            .foregroundStyle(Color.appForeground.opacity(0.5))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.appForeground.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.12), lineWidth: 1))
                 }
-                .tint(Color.appError)
-            .frame(maxWidth: 300)
+                .frame(maxWidth: 300)
+            }
         }
         .padding(16)
         .background(Color.appForeground.opacity(0.05))
@@ -77,8 +98,7 @@ struct SettingsView: View {
                 Toggle("Launch at Login", isOn: $launchAtLogin)
                     .font(Font.appBody)
                     .foregroundStyle(Color.appForeground)
-                    .toggleStyle(.switch)
-                    .tint(Color.appError)
+                    .toggleStyle(AppToggleStyle())
                     .onChange(of: launchAtLogin) { _, newValue in
                         do {
                             if newValue {

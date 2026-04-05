@@ -3,11 +3,13 @@ import CoreGraphics
 import Foundation
 
 /// Intercepts system-wide keyboard events via CGEvent Tap to detect Fn key
-/// press/release transitions and Space key presses for Lock-in mode.
+/// press/release transitions, Space key presses for Lock-in mode, and
+/// Escape key presses for recording cancellation.
 ///
 /// Requires Accessibility permission (AXIsProcessTrusted) before the tap
-/// can be installed. The tap listens in read-only mode (.listenOnly) and
-/// does not block or modify any events.
+/// can be installed. The tap runs in active-filter mode (.defaultTap) so
+/// that consumed events (e.g. Space during lock-in, isolated Fn presses)
+/// are suppressed and never reach the focused application or macOS.
 ///
 /// The RunLoop source is added to the main RunLoop, so all callbacks
 /// fire on the main thread.
@@ -27,13 +29,20 @@ final class GlobalInputManager {
     )
 
     /// Called when the Fn key is pressed (flag appeared in mask).
-    var onFnPress: (() -> Void)?
+    /// Return `true` to suppress the event (prevent it from reaching other apps/macOS).
+    var onFnPress: (() -> Bool)?
 
     /// Called when the Fn key is released (flag disappeared from mask).
-    var onFnRelease: (() -> Void)?
+    /// Return `true` to suppress the event.
+    var onFnRelease: (() -> Bool)?
 
     /// Called when the Space key is pressed (.keyDown with keyCode 49).
-    var onSpacePress: (() -> Void)?
+    /// Return `true` to suppress the event.
+    var onSpacePress: (() -> Bool)?
+
+    /// Called when the Escape key is pressed (.keyDown with keyCode 53).
+    /// Return `true` to suppress the event.
+    var onEscPress: (() -> Bool)?
 
     /// Called when the system disables the event tap and re-enablement is attempted.
     var onTapDisabled: (() -> Void)?
@@ -59,7 +68,7 @@ final class GlobalInputManager {
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
-            options: .listenOnly,
+            options: .defaultTap,
             eventsOfInterest: eventMask,
             callback: globalInputEventTapCallback,
             userInfo: refcon
@@ -110,43 +119,48 @@ final class GlobalInputManager {
                 CGEvent.tapEnable(tap: tap, enable: true)
             }
             onTapDisabled?()
+            return Unmanaged.passUnretained(event)
 
         case .flagsChanged:
-            handleFlagsChanged(event: event)
+            let suppress = handleFlagsChanged(event: event)
+            return suppress ? nil : Unmanaged.passUnretained(event)
 
         case .keyDown:
-            handleKeyDown(event: event)
+            let suppress = handleKeyDown(event: event)
+            return suppress ? nil : Unmanaged.passUnretained(event)
 
         default:
-            break
+            return Unmanaged.passUnretained(event)
         }
-
-        return Unmanaged.passUnretained(event)
     }
 
-    private func handleFlagsChanged(event: CGEvent) {
+    private func handleFlagsChanged(event: CGEvent) -> Bool {
         let currentFlags = event.flags
         let diff = CGEventFlags(rawValue: previousFlags.rawValue ^ currentFlags.rawValue)
         previousFlags = currentFlags
 
         // Only respond if the Fn flag changed
-        guard diff.contains(.maskSecondaryFn) else { return }
+        guard diff.contains(.maskSecondaryFn) else { return false }
 
         // Ignore when other modifier keys changed simultaneously
-        guard diff.intersection(Self.otherModifierMask).isEmpty else { return }
+        guard diff.intersection(Self.otherModifierMask).isEmpty else { return false }
 
         if currentFlags.contains(.maskSecondaryFn) {
-            onFnPress?()
+            return onFnPress?() ?? false
         } else {
-            onFnRelease?()
+            return onFnRelease?() ?? false
         }
     }
 
-    private func handleKeyDown(event: CGEvent) {
+    private func handleKeyDown(event: CGEvent) -> Bool {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-        // Space bar keyCode = 49
-        if keyCode == 49 {
-            onSpacePress?()
+        switch keyCode {
+        case 49: // Space bar
+            return onSpacePress?() ?? false
+        case 53: // Escape
+            return onEscPress?() ?? false
+        default:
+            return false
         }
     }
 

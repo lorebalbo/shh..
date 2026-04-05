@@ -31,12 +31,15 @@ final class TextProcessingPipeline {
     func process(rawText: String) async -> TextProcessingResult {
         // Step 1: Check if a Style is active
         guard let activeStyle = fetchActiveStyle() else {
+            PipelineEventLog.shared.append("ℹ️ No active style — skipping LLM processing", kind: .info)
             return TextProcessingResult(rawText: rawText, processedText: nil, styleId: nil)
         }
 
         // Step 2: Check if an LLM provider is configured
         guard let activeProvider = fetchActiveProvider() else {
-            postWarning("No LLM provider configured. Style \"\(activeStyle.name)\" was not applied. Configure a provider in Settings.")
+            let msg = "No LLM provider configured. Style \"\(activeStyle.name)\" was not applied. Configure a provider in Settings."
+            PipelineEventLog.shared.append("⚠️ " + msg, kind: .error)
+            postWarning(msg)
             return TextProcessingResult(rawText: rawText, processedText: nil, styleId: activeStyle.id)
         }
 
@@ -48,7 +51,13 @@ final class TextProcessingPipeline {
         // Step 4: Build the appropriate LLM client and send the request
         let provider = buildProvider(from: activeProvider)
 
-        PipelineEventLog.shared.append("Applying style \"\(activeStyle.name)\" via \(activeProvider.modelName)...", kind: .info)
+        let resolvedURL: String
+        switch activeProvider.providerType {
+        case .anthropic: resolvedURL = activeProvider.endpointURL.isEmpty ? "https://api.anthropic.com" : activeProvider.endpointURL
+        case .openAI:    resolvedURL = activeProvider.endpointURL.isEmpty ? "https://api.openai.com" : activeProvider.endpointURL
+        case .local:     resolvedURL = activeProvider.endpointURL
+        }
+        PipelineEventLog.shared.append("🧠 Style \"\(activeStyle.name)\" | model: \(activeProvider.modelName) | endpoint: \(resolvedURL)", kind: .info)
 
         do {
             let processedText = try await provider.complete(

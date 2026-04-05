@@ -105,6 +105,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 vm.isRecording = false
             }
         }
+        let originalOnCancel = coordinator.stateMachine.onRecordingDidCancel
+        coordinator.stateMachine.onRecordingDidCancel = {
+            originalOnCancel?()
+            DispatchQueue.main.async {
+                vm.isRecording = false
+            }
+        }
 
         // Bind audio level to overlay
         audioLevelCancellable = coordinator.audioCaptureManager.audioLevelSubject
@@ -177,6 +184,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         coordinator.stateMachine.onForcedIdle = {
+            DispatchQueue.main.async {
+                vm.isRecording = false
+                pickerCtrl.hide()
+            }
+        }
+
+        let previousOnCancel = coordinator.stateMachine.onRecordingDidCancel
+        coordinator.stateMachine.onRecordingDidCancel = {
+            previousOnCancel?()
             DispatchQueue.main.async {
                 vm.isRecording = false
                 pickerCtrl.hide()

@@ -76,26 +76,38 @@ final class LLMClient: LLMProvider {
         )
         request.httpBody = try JSONEncoder().encode(body)
 
+        PipelineEventLog.shared.append("→ POST \(url.absoluteString) [model: \(modelName)]", kind: .info)
+
         let data: Data
         let response: URLResponse
         do {
             (data, response) = try await session.data(for: request)
         } catch let error as URLError where error.code == .timedOut {
+            PipelineEventLog.shared.append("❌ Request timed out — \(url.absoluteString)", kind: .error)
             throw LLMError.timeout
         } catch {
+            PipelineEventLog.shared.append("❌ Network error: \(error.localizedDescription)", kind: .error)
             throw LLMError.networkError(error)
         }
 
+        if let http = response as? HTTPURLResponse {
+            PipelineEventLog.shared.append("← HTTP \(http.statusCode) from \(url.host ?? url.absoluteString)", kind: http.statusCode < 300 ? .info : .error)
+        }
+
         try validateHTTPResponse(response)
-        return try parseOpenAIResponse(data)
+        return try parseOpenAIResponse(data, url: url)
     }
 
     // MARK: - Private
 
     private func buildURL() throws -> URL {
-        let endpoint = baseURL.hasSuffix("/")
-            ? "\(baseURL)v1/chat/completions"
-            : "\(baseURL)/v1/chat/completions"
+        // Normalize: strip trailing slashes and any trailing /v1 (or /v1/)
+        // so that users pasting "http://localhost:1234/v1" don't get /v1/v1/...
+        var base = baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if base.hasSuffix("/v1") {
+            base = String(base.dropLast(3))
+        }
+        let endpoint = "\(base)/v1/chat/completions"
         guard let url = URL(string: endpoint) else {
             throw LLMError.invalidResponse("Invalid base URL: \(baseURL)")
         }
@@ -120,21 +132,29 @@ final class LLMClient: LLMProvider {
         }
     }
 
-    private func parseOpenAIResponse(_ data: Data) throws -> String {
+    private func parseOpenAIResponse(_ data: Data, url: URL) throws -> String {
         let decoded: OpenAIChatResponse
         do {
             decoded = try JSONDecoder().decode(OpenAIChatResponse.self, from: data)
         } catch {
+            // Log up to 500 chars of the raw body so the user can see what the server returned
+            let rawBody = String(data: data, encoding: .utf8) ?? "<non-UTF8 body>"
+            let preview = String(rawBody.prefix(500))
+            PipelineEventLog.shared.append("❌ Decode error: \(error.localizedDescription)", kind: .error)
+            PipelineEventLog.shared.append("   Raw body: \(preview)", kind: .error)
             throw LLMError.invalidResponse("Failed to decode response: \(error.localizedDescription)")
         }
 
         guard let choice = decoded.choices.first,
-              !choice.message.content.isEmpty
+              let content = choice.message.content,
+              !content.isEmpty
         else {
+            let rawBody = String(data: data, encoding: .utf8).map { String($0.prefix(300)) } ?? "<non-UTF8>"
+            PipelineEventLog.shared.append("❌ No content in response — raw: \(rawBody)", kind: .error)
             throw LLMError.invalidResponse("No content in response choices")
         }
 
-        return choice.message.content
+        return content
     }
 }
 
@@ -158,6 +178,6 @@ private struct OpenAIChatResponse: Decodable {
     }
 
     struct Message: Decodable {
-        let content: String
+        let content: String?
     }
 }

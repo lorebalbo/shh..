@@ -26,6 +26,8 @@ struct HomeView: View {
             } else {
                 entryList
             }
+            Divider()
+            diagnosticPanel
         }
         .background(Color.appBackground)
     }
@@ -43,7 +45,7 @@ struct HomeView: View {
                 Image(systemName: "magnifyingglass")
                     .font(Font.appCaption)
                     .foregroundStyle(Color.appForeground.opacity(0.4))
-                TextField("Search dictations", text: $searchText)
+                TextField("", text: $searchText, prompt: Text("Search dictations").foregroundColor(Color.appForeground.opacity(0.4)))
                     .font(Font.appCallout)
                     .textFieldStyle(.plain)
                     .foregroundStyle(Color.appForeground)
@@ -71,19 +73,25 @@ struct HomeView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        ContentUnavailableView {
-            Label(
-                searchText.isEmpty ? "No Dictations Yet" : "No Results",
-                systemImage: searchText.isEmpty ? "waveform" : "magnifyingglass"
-            )
-        } description: {
+        VStack(spacing: 12) {
+            Image(systemName: searchText.isEmpty ? "waveform" : "magnifyingglass")
+                .font(.system(size: 36))
+                .foregroundStyle(Color.appForeground.opacity(0.25))
+            Text(searchText.isEmpty ? "No Dictations Yet" : "No Results")
+                .font(Font.appTitle3)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.appForeground)
             Text(
                 searchText.isEmpty
                 ? "Your dictation history will appear here."
                 : "No dictations match \"\(searchText)\"."
             )
+            .font(Font.appBody)
+            .foregroundStyle(Color.appForeground.opacity(0.45))
+            .multilineTextAlignment(.center)
         }
-        .frame(maxHeight: .infinity)
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Diagnostic Log
@@ -319,8 +327,8 @@ private struct DictationEntryRow: View {
         .frame(minHeight: 122)
         .background(
             isHovered
-                ? Color(NSColor.controlBackgroundColor).opacity(0.75)
-                : Color(NSColor.controlBackgroundColor).opacity(0.5)
+                ? Color.appForeground.opacity(0.07)
+                : Color.appForeground.opacity(0.03)
         )
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(

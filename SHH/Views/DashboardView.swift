@@ -63,7 +63,9 @@ private struct DashboardContentView: View {
         HStack(spacing: 0) {
             SidebarView(selection: $selectedSection, collapsed: $sidebarCollapsed)
 
-            Divider()
+            Rectangle()
+                .fill(Color.appForeground.opacity(0.12))
+                .frame(width: 1)
 
             detailView
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -122,19 +124,25 @@ private struct SidebarView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header: Logo & Title + Collapse Toggle
-            HStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 0) {
                 if !collapsed {
-                    HStack(spacing: 8) {
-                        Image(systemName: "waveform")
-                            .font(Font.appTitle3)
-                            .frame(width: 24, alignment: .center)
-                        Text("Shh...")
-                            .font(Font.appTitle3)
-                            .fontWeight(.bold)
-                            .fixedSize()
+                    Button {
+                        selection = .home
+                    } label: {
+                        HStack(spacing: 0) {
+                            Image(systemName: "waveform")
+                                .font(.system(size: 15))
+                                .frame(width: 24, alignment: .center)
+                                .padding(.leading, 20)
+                            Text("Shh...")
+                                .font(Font.appTitle3)
+                                .fontWeight(.bold)
+                                .fixedSize()
+                                .padding(.leading, 8)
+                        }
+                        .foregroundStyle(selection == .home ? Color.appError : Color.appForeground)
                     }
-                    .foregroundStyle(Color.appForeground)
-                    .padding(.leading, 20)
+                    .buttonStyle(.plain)
                     .transition(.opacity)
                 }
 
@@ -146,7 +154,7 @@ private struct SidebarView: View {
                     }
                 } label: {
                     Image(systemName: collapsed ? "sidebar.right" : "sidebar.left")
-                        .font(Font.appTitle3)
+                        .font(.system(size: 15))
                         .foregroundStyle(Color.appForeground.opacity(0.8))
                         .frame(width: 44, height: 44)
                 }
@@ -190,21 +198,23 @@ private struct SidebarRow: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
                 Image(systemName: section.icon)
-                    .font(Font.appTitle3) // Ensure smaller icon size
-                    .frame(width: 24, alignment: .center)
+                    .font(.system(size: 13))
+                    .frame(width: 20, height: 20, alignment: .center)
 
-                Text(section.label)
-                    .font(Font.appBody)
-                    .lineLimit(1)
-                    .fixedSize()
+                if !isCollapsed {
+                    Text(section.label)
+                        .font(.custom("League Spartan", size: 14))
+                        .lineLimit(1)
+                        .frame(height: 20, alignment: .center)
+                        .transition(.opacity)
+                }
             }
             .padding(.vertical, 6)
             .padding(.horizontal, 10)
             .frame(width: isCollapsed ? 44 : 160, alignment: .leading)
             .contentShape(Rectangle())
-            .clipped() // Fixed icon centering with smooth collapse!
             .background(
                 isSelected
                     ? Color.appForeground.opacity(0.15)
