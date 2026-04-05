@@ -139,7 +139,7 @@ private struct SidebarView: View {
                                 .fontWeight(.semibold)
                                 .fixedSize()
                         }
-                        .foregroundStyle(selection == .home ? Color.appError : Color.appForeground)
+                        .foregroundStyle(Color.appForeground)
                     }
                     .buttonStyle(.plain)
                     .transition(.opacity)

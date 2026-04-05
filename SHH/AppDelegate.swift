@@ -13,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var modelContainer: ModelContainer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApplication.shared.applicationIconImage = makeAppIcon()
+
         // Request microphone access early so the system dialog appears immediately
         // rather than silently capturing silence the first time the user records.
         AVAudioApplication.requestRecordPermission { _ in }
@@ -40,6 +42,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        NotificationCenter.default.post(name: .openDashboardWindow, object: nil)
+        return true
+    }
+
+    // MARK: - App Icon
+
+    private func makeAppIcon() -> NSImage {
+        let canvasSize = CGSize(width: 512, height: 512)
+        let bgColor = NSColor(red: 233 / 255.0, green: 79 / 255.0, blue: 55 / 255.0, alpha: 1.0)
+        let fgColor = NSColor(red: 246 / 255.0, green: 247 / 255.0, blue: 235 / 255.0, alpha: 1.0)
+
+        return NSImage(size: canvasSize, flipped: false) { rect in
+            bgColor.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: 115, yRadius: 115).fill()
+
+            let config = NSImage.SymbolConfiguration(paletteColors: [fgColor])
+            guard let symbol = NSImage(systemSymbolName: "waveform", accessibilityDescription: nil)?
+                .withSymbolConfiguration(config) else { return true }
+
+            let targetHeight = canvasSize.height * 0.42
+            let scale = targetHeight / symbol.size.height
+            let scaledWidth = symbol.size.width * scale
+            let drawRect = NSRect(
+                x: (canvasSize.width - scaledWidth) / 2,
+                y: (canvasSize.height - targetHeight) / 2,
+                width: scaledWidth,
+                height: targetHeight
+            )
+            symbol.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1.0)
+            return true
+        }
     }
 
     private func setupRecordingCoordinator() {
@@ -215,4 +251,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 extension Notification.Name {
     static let shhTranscriptionDidComplete = Notification.Name("shhTranscriptionDidComplete")
     static let shhRecordingError = Notification.Name("shhRecordingError")
+    static let openDashboardWindow = Notification.Name("openDashboardWindow")
 }

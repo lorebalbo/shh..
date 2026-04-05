@@ -6,14 +6,6 @@ struct MenuBarView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
-        Button("Open Dashboard") {
-            openWindow(id: "dashboard")
-            NSApplication.shared.activate(ignoringOtherApps: true)
-        }
-        .keyboardShortcut("d")
-
-        Divider()
-
         Toggle("Launch at Login", isOn: $launchAtLogin)
             .tint(Color.appError)
             .onChange(of: launchAtLogin) { _, newValue in
@@ -35,5 +27,9 @@ struct MenuBarView: View {
             NSApplication.shared.terminate(nil)
         }
         .keyboardShortcut("q")
+        .onReceive(NotificationCenter.default.publisher(for: .openDashboardWindow)) { _ in
+            openWindow(id: "dashboard")
+            NSApplication.shared.activate(ignoringOtherApps: true)
+        }
     }
 }

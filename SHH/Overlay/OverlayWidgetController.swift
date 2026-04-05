@@ -31,6 +31,7 @@ final class OverlayWidgetController: @unchecked Sendable {
     private let viewModel: OverlayViewModel
     private var screenObserver: NSObjectProtocol?
     private var dragStartOrigin: NSPoint = .zero
+    private var isDragStarted = false
 
     // MARK: - Init
 
@@ -108,10 +109,11 @@ final class OverlayWidgetController: @unchecked Sendable {
     private func setupDragHandling() {
         viewModel.onDragChanged = { [weak self] translation in
             guard let self else { return }
-            if self.dragStartOrigin == .zero {
+            if !self.isDragStarted {
+                self.isDragStarted = true
                 self.dragStartOrigin = self.panel.frame.origin
             }
-            // SwiftUI DragGesture Y is inverted relative to AppKit coordinates
+            // SwiftUI global DragGesture Y is inverted relative to AppKit coordinates
             let newOrigin = NSPoint(
                 x: self.dragStartOrigin.x + translation.width,
                 y: self.dragStartOrigin.y - translation.height
@@ -133,6 +135,7 @@ final class OverlayWidgetController: @unchecked Sendable {
             }
             self.savePosition(snapped)
             self.dragStartOrigin = .zero
+            self.isDragStarted = false
         }
     }
 
