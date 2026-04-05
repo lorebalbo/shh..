@@ -13,7 +13,7 @@ struct PermissionDeniedView: View {
                 .font(Font.appTitle2)
                 .fontWeight(.semibold)
 
-            Text("SHH needs the following permissions to function correctly.")
+            Text("Shh.. needs the following permissions to function correctly.")
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 

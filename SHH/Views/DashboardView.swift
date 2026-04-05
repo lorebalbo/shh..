@@ -299,7 +299,7 @@ struct HelpView: View {
             VStack(alignment: .leading, spacing: 8) {
                 shortcutRow(key: "Fn", description: "Hold to record, release to transcribe")
                 shortcutRow(key: "Cmd+D", description: "Open Dashboard from menu bar")
-                shortcutRow(key: "Cmd+Q", description: "Quit SHH")
+                shortcutRow(key: "Cmd+Q", description: "Quit Shh..")
             }
         }
         .padding(16)
@@ -313,7 +313,7 @@ struct HelpView: View {
             Label("About", systemImage: "info.circle")
                 .font(Font.appHeadline)
                 .foregroundStyle(Color.appForeground)
-            Text("SHH is a macOS voice utility that transcribes speech using on-device Whisper models and optionally processes text through AI styles.")
+            Text("Shh.. is a macOS voice utility that transcribes speech using on-device Whisper models and optionally processes text through AI styles.")
                 .font(Font.appBody)
                 .foregroundStyle(Color.appForeground.opacity(0.6))
         }
@@ -363,7 +363,7 @@ private struct OnboardingSheet: View {
                 .font(.custom("League Spartan", size: 42))
                 .foregroundStyle(.tint)
 
-            Text("Welcome to SHH")
+            Text("Welcome to Shh..")
                 .font(Font.appTitle)
                 .fontWeight(.bold)
 

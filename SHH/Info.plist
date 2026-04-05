@@ -11,7 +11,9 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>SHH</string>
+    <string>Shh..</string>
+    <key>CFBundleDisplayName</key>
+    <string>Shh..</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -22,7 +24,7 @@
     <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 
     <key>NSMicrophoneUsageDescription</key>
-    <string>SHH needs microphone access to capture voice dictation for transcription.</string>
+    <string>Shh.. needs microphone access to capture voice dictation for transcription.</string>
     <key>ATSApplicationFontsPath</key>
     <string>Fonts</string>
     <key>UIAppFonts</key>

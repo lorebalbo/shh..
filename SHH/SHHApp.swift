@@ -30,7 +30,7 @@ struct SHHApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("SHH", systemImage: "waveform") {
+        MenuBarExtra("Shh..", systemImage: "waveform") {
             MenuBarView()
         }
         .modelContainer(modelContainer)
