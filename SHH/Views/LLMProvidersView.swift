@@ -32,7 +32,7 @@ struct LLMProvidersView: View {
     private var header: some View {
         HStack {
             Text("LLM Providers")
-                .font(Font.appTitle3)
+                .font(Font.appHeadline)
                 .fontWeight(.bold)
                 .foregroundStyle(Color.appForeground)
             Spacer()
@@ -49,6 +49,7 @@ struct LLMProvidersView: View {
         }
         .padding(.horizontal, 24)
         .frame(height: 52)
+        .padding(.top, 10)
     }
 
     // MARK: - Empty State

@@ -257,13 +257,14 @@ struct HelpView: View {
     private var header: some View {
         HStack {
             Text("Help")
-                .font(Font.appTitle3)
+                .font(Font.appHeadline)
                 .fontWeight(.bold)
                 .foregroundStyle(Color.appForeground)
             Spacer()
         }
         .padding(.horizontal, 24)
         .frame(height: 52)
+        .padding(.top, 10)
     }
 
     private var gettingStartedSection: some View {
