@@ -281,11 +281,9 @@ private struct ProviderFormSheet: View {
                             .font(Font.appSubheadline)
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.appForeground.opacity(0.7))
-                        Menu {
-                            Button("Anthropic") { providerType = .anthropic }
-                            Button("OpenAI") { providerType = .openAI }
-                            Button("Local") { providerType = .local }
-                        } label: {
+                        // ZStack separates the visual layer from the Menu interaction layer,
+                        // preventing macOS borderlessButton from centering the label content.
+                        ZStack {
                             HStack {
                                 Text(providerTypeLabel)
                                     .font(Font.appBody)
@@ -298,15 +296,22 @@ private struct ProviderFormSheet: View {
                             .padding(.horizontal, 12)
                             .padding(.vertical, 10)
                             .frame(maxWidth: .infinity)
+                            .background(Color.appForeground.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.12), lineWidth: 1))
+
+                            Menu {
+                                Button("Anthropic") { providerType = .anthropic }
+                                Button("OpenAI") { providerType = .openAI }
+                                Button("Local") { providerType = .local }
+                            } label: {
+                                Color.clear
+                            }
+                            .menuStyle(.borderlessButton)
+                            .menuIndicator(.hidden)
+                            .environment(\.colorScheme, .light)
+                            .frame(maxWidth: .infinity)
                         }
-                        .menuStyle(.borderlessButton)
-                        .menuIndicator(.hidden)
-                        .frame(maxWidth: .infinity)
-                        .background(Color.appForeground.opacity(0.06))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.12), lineWidth: 1))
-                        .contentShape(Rectangle())
-                        .environment(\.colorScheme, .light)
                     }
 
                     // API Key (cloud only)
@@ -383,14 +388,7 @@ private struct ProviderFormSheet: View {
                             }
                         }
                         if !availableModels.isEmpty {
-                            Menu {
-                                if !modelName.isEmpty && !availableModels.contains(modelName) {
-                                    Button(modelName) { }
-                                }
-                                ForEach(availableModels, id: \.self) { model in
-                                    Button(model) { modelName = model }
-                                }
-                            } label: {
+                            ZStack {
                                 HStack {
                                     Text(modelName.isEmpty ? "Select a model" : modelName)
                                         .font(Font.appBody)
@@ -403,15 +401,25 @@ private struct ProviderFormSheet: View {
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 10)
                                 .frame(maxWidth: .infinity)
+                                .background(Color.appForeground.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.12), lineWidth: 1))
+
+                                Menu {
+                                    if !modelName.isEmpty && !availableModels.contains(modelName) {
+                                        Button(modelName) { }
+                                    }
+                                    ForEach(availableModels, id: \.self) { model in
+                                        Button(model) { modelName = model }
+                                    }
+                                } label: {
+                                    Color.clear
+                                }
+                                .menuStyle(.borderlessButton)
+                                .menuIndicator(.hidden)
+                                .environment(\.colorScheme, .light)
+                                .frame(maxWidth: .infinity)
                             }
-                            .menuStyle(.borderlessButton)
-                            .menuIndicator(.hidden)
-                            .frame(maxWidth: .infinity)
-                            .background(Color.appForeground.opacity(0.06))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.12), lineWidth: 1))
-                            .contentShape(Rectangle())
-                            .environment(\.colorScheme, .light)
                         } else {
                             TextField("", text: $modelName)
                                 .focused($focusedField, equals: .modelName)
