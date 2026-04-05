@@ -72,16 +72,19 @@ struct SettingsView: View {
                             .font(Font.appBody)
                             .foregroundStyle(Color.appForeground)
                         Spacer()
-                        Image(systemName: "chevron.up.chevron.down")
+                        Image(systemName: "chevron.down")
                             .font(Font.appCaption)
                             .foregroundStyle(Color.appForeground.opacity(0.5))
                     }
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 10)
                     .background(Color.appForeground.opacity(0.06))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.12), lineWidth: 1))
                 }
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .environment(\.colorScheme, .light)
                 .frame(maxWidth: 300)
             }
         }
