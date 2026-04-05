@@ -29,13 +29,14 @@ struct SettingsView: View {
     private var header: some View {
         HStack {
             Text("Settings")
-                .font(Font.appTitle3)
+                .font(Font.appHeadline)
                 .fontWeight(.bold)
                 .foregroundStyle(Color.appForeground)
             Spacer()
         }
         .padding(.horizontal, 24)
         .frame(height: 52)
+        .padding(.top, 10)
     }
 
     // MARK: - Transcription Section

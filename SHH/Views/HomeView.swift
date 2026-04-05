@@ -37,7 +37,7 @@ struct HomeView: View {
     private var header: some View {
         HStack(spacing: 12) {
             Text("Home")
-                .font(Font.appTitle3)
+                .font(Font.appHeadline)
                 .fontWeight(.bold)
                 .foregroundStyle(Color.appForeground)
             Spacer()
@@ -68,6 +68,7 @@ struct HomeView: View {
         }
         .padding(.horizontal, 24)
         .frame(height: 52)
+        .padding(.top, 10)
     }
 
     // MARK: - Empty State
