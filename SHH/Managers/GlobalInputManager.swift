@@ -7,10 +7,18 @@ import Foundation
 /// Escape key presses for recording cancellation.
 ///
 /// Requires Accessibility permission (AXIsProcessTrusted) before the tap
-/// can be installed. The tap runs in active-filter mode (.defaultTap) at
-/// the HID level so that consumed events are suppressed before macOS can
-/// process them (e.g. Fn double-tap → emoji picker). Falls back to
-/// session-level tap if the HID tap cannot be created.
+/// can be installed. The tap runs in active-filter mode (.defaultTap) so
+/// that consumed events (e.g. Space during lock-in, isolated Fn presses)
+/// are suppressed and never reach the focused application or macOS.
+///
+/// **Fn/Globe key strategy:** The Fn/Globe key on macOS is partially
+/// handled at the HID level *before* CGEvent taps. Returning `nil`
+/// (suppressing) flagsChanged events does not reliably prevent macOS from
+/// triggering the emoji picker. Instead, when we consume an Fn event we
+/// *strip the `.maskSecondaryFn` flag* from the event — making the Fn
+/// state change invisible to macOS while still forwarding other modifier
+/// changes. keyDown/keyUp events for the Globe key (keyCodes 63 & 179)
+/// are also intercepted and suppressed when the Fn press was consumed.
 ///
 /// The RunLoop source is added to the main RunLoop, so all callbacks
 /// fire on the main thread.
@@ -19,9 +27,11 @@ final class GlobalInputManager {
     private var runLoopSource: CFRunLoopSource?
     private var previousFlags: CGEventFlags = []
 
-    /// When `true`, the next Escape keyDown is a synthetic event we posted
-    /// to dismiss the emoji picker — pass it through without consuming.
-    private var passThroughNextEscape = false
+    /// Tracks whether the most recent Fn press was consumed by the app.
+    /// Persists across the press → release → keyUp cycle so that all
+    /// related events for the same physical key action are handled.
+    /// Reset on the next Fn press.
+    private var fnPressConsumed = false
 
     /// Modifier keys that must NOT change simultaneously with Fn for the
     /// event to be considered an isolated Fn key event.
@@ -34,11 +44,11 @@ final class GlobalInputManager {
     )
 
     /// Called when the Fn key is pressed (flag appeared in mask).
-    /// Return `true` to suppress the event (prevent it from reaching other apps/macOS).
+    /// Return `true` to consume the event (prevent it from reaching macOS).
     var onFnPress: (() -> Bool)?
 
     /// Called when the Fn key is released (flag disappeared from mask).
-    /// Return `true` to suppress the event.
+    /// Return `true` to consume the event.
     var onFnRelease: (() -> Bool)?
 
     /// Called when the Space key is pressed (.keyDown with keyCode 49).
@@ -54,8 +64,8 @@ final class GlobalInputManager {
 
     private(set) var isRunning = false
 
-    /// Installs a CGEvent Tap on the current session for `.flagsChanged`
-    /// and `.keyDown` events.
+    /// Installs a CGEvent Tap on the current session for `.flagsChanged`,
+    /// `.keyDown`, and `.keyUp` events.
     ///
     /// - Returns: `true` if the tap was successfully installed, `false` if
     ///   Accessibility permission is missing or the tap could not be created.
@@ -67,33 +77,18 @@ final class GlobalInputManager {
         let eventMask: CGEventMask =
             (1 << CGEventType.flagsChanged.rawValue)
             | (1 << CGEventType.keyDown.rawValue)
+            | (1 << CGEventType.keyUp.rawValue)
 
         let refcon = Unmanaged.passUnretained(self).toOpaque()
 
-        // Prefer HID-level tap to intercept Fn key events before the system's
-        // emoji picker detection can see them. Fall back to session-level tap
-        // if HID tap creation fails (e.g. insufficient privileges on some
-        // macOS versions).
-        let tap: CFMachPort
-        if let hidTap = CGEvent.tapCreate(
-            tap: .cghidEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: eventMask,
-            callback: globalInputEventTapCallback,
-            userInfo: refcon
-        ) {
-            tap = hidTap
-        } else if let sessionTap = CGEvent.tapCreate(
+        guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
             options: .defaultTap,
             eventsOfInterest: eventMask,
             callback: globalInputEventTapCallback,
             userInfo: refcon
-        ) {
-            tap = sessionTap
-        } else {
+        ) else {
             return false
         }
 
@@ -123,6 +118,7 @@ final class GlobalInputManager {
         }
 
         previousFlags = []
+        fnPressConsumed = false
         isRunning = false
     }
 
@@ -143,11 +139,21 @@ final class GlobalInputManager {
             return Unmanaged.passUnretained(event)
 
         case .flagsChanged:
-            let suppress = handleFlagsChanged(event: event)
-            return suppress ? nil : Unmanaged.passUnretained(event)
+            // For flagsChanged events we NEVER return nil. Instead we modify
+            // the event's flags to strip `maskSecondaryFn` when consuming.
+            // This is necessary because the Fn/Globe key emoji picker is
+            // triggered at the HID level — suppressing the CGEvent alone
+            // does not prevent it. Stripping the flag makes the Fn state
+            // change invisible to macOS.
+            handleFlagsChanged(event: event)
+            return Unmanaged.passUnretained(event)
 
         case .keyDown:
             let suppress = handleKeyDown(event: event)
+            return suppress ? nil : Unmanaged.passUnretained(event)
+
+        case .keyUp:
+            let suppress = handleKeyUp(event: event)
             return suppress ? nil : Unmanaged.passUnretained(event)
 
         default:
@@ -155,25 +161,42 @@ final class GlobalInputManager {
         }
     }
 
-    private func handleFlagsChanged(event: CGEvent) -> Bool {
+    /// Processes Fn flag changes. When consumed, modifies `event.flags`
+    /// in place to strip `.maskSecondaryFn` so macOS never detects the
+    /// Fn key transition.
+    private func handleFlagsChanged(event: CGEvent) {
         let currentFlags = event.flags
         let diff = CGEventFlags(rawValue: previousFlags.rawValue ^ currentFlags.rawValue)
         previousFlags = currentFlags
 
         // Only respond if the Fn flag changed
-        guard diff.contains(.maskSecondaryFn) else { return false }
+        guard diff.contains(.maskSecondaryFn) else { return }
 
         // Ignore when other modifier keys changed simultaneously
-        guard diff.intersection(Self.otherModifierMask).isEmpty else { return false }
+        guard diff.intersection(Self.otherModifierMask).isEmpty else { return }
 
         if currentFlags.contains(.maskSecondaryFn) {
+            // Fn pressed
             let consumed = onFnPress?() ?? false
-            if consumed { scheduleEmojiPickerDismissal() }
-            return consumed
+            fnPressConsumed = consumed
+            if consumed {
+                // Strip Fn flag — macOS will not see the Fn press
+                event.flags = currentFlags.subtracting(.maskSecondaryFn)
+            }
         } else {
-            let consumed = onFnRelease?() ?? false
-            if consumed { scheduleEmojiPickerDismissal() }
-            return consumed
+            // Fn released
+            if fnPressConsumed {
+                // The corresponding press was consumed (Fn stripped),
+                // so the system never saw Fn go down. This release is
+                // effectively a no-op from the system's perspective
+                // (Fn already absent in both previous and current flags).
+                _ = onFnRelease?() ?? false
+                // fnPressConsumed stays true until the next Fn press
+                // so any trailing Globe keyUp is also suppressed.
+                return
+            }
+            // Press was NOT consumed — let the release flow through normally
+            _ = onFnRelease?() ?? false
         }
     }
 
@@ -183,56 +206,25 @@ final class GlobalInputManager {
         case 49: // Space bar
             return onSpacePress?() ?? false
         case 53: // Escape
-            if passThroughNextEscape {
-                passThroughNextEscape = false
-                return false
-            }
             return onEscPress?() ?? false
+        case 63, 179:
+            // Fn/Globe key — on Apple Silicon Macs the Globe key generates
+            // keyDown events in addition to flagsChanged. Suppress when
+            // we consumed the Fn press to prevent the emoji picker.
+            return fnPressConsumed
         default:
             return false
         }
     }
 
-    // MARK: - Emoji Picker Safety Net
-
-    /// After each consumed Fn event, check whether macOS opened the emoji
-    /// picker despite our suppression, and dismiss it if so.
-    private func scheduleEmojiPickerDismissal() {
-        // All callbacks fire on the main thread (RunLoop source is on main RunLoop),
-        // so this dispatch is same-thread. Use nonisolated(unsafe) to satisfy the
-        // concurrency checker — same pattern used throughout this codebase.
-        nonisolated(unsafe) let dismiss = self.dismissEmojiPickerIfPresent
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            dismiss()
-        }
-    }
-
-    private func dismissEmojiPickerIfPresent() {
-        guard let windowList = CGWindowListCopyWindowInfo(
-            [.optionOnScreenOnly, .excludeDesktopElements],
-            kCGNullWindowID
-        ) as? [[String: Any]] else { return }
-
-        for window in windowList {
-            let ownerName = window[kCGWindowOwnerName as String] as? String ?? ""
-            let windowName = window[kCGWindowName as String] as? String ?? ""
-
-            guard ownerName == "TextInputMenuAgent"
-                || windowName == "Character Palette"
-                || windowName == "Character Viewer"
-                || windowName == "Emoji & Symbols"
-            else { continue }
-
-            // Mark next Escape as synthetic so our handler passes it through
-            passThroughNextEscape = true
-
-            if let escDown = CGEvent(keyboardEventSource: nil, virtualKey: 0x35, keyDown: true) {
-                escDown.post(tap: .cghidEventTap)
-            }
-            if let escUp = CGEvent(keyboardEventSource: nil, virtualKey: 0x35, keyDown: false) {
-                escUp.post(tap: .cghidEventTap)
-            }
-            return
+    private func handleKeyUp(event: CGEvent) -> Bool {
+        let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+        switch keyCode {
+        case 63, 179:
+            // Suppress Globe key-up if we consumed the Fn press
+            return fnPressConsumed
+        default:
+            return false
         }
     }
 
