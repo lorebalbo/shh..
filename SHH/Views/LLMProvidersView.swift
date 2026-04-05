@@ -35,6 +35,9 @@ struct LLMProvidersView: View {
                 .font(Font.appHeadline)
                 .fontWeight(.bold)
                 .foregroundStyle(Color.appForeground)
+                .alignmentGuide(VerticalAlignment.center) { d in
+                    d[.firstTextBaseline] / 2
+                }
             Spacer()
             Button {
                 showCreateSheet = true

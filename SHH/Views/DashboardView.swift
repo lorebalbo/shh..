@@ -138,6 +138,9 @@ private struct SidebarView: View {
                                 .font(Font.appHeadline)
                                 .fontWeight(.semibold)
                                 .fixedSize()
+                                .alignmentGuide(VerticalAlignment.center) { d in
+                                    d[.firstTextBaseline] / 2
+                                }
                         }
                         .foregroundStyle(Color.appForeground)
                     }
@@ -260,6 +263,9 @@ struct HelpView: View {
                 .font(Font.appHeadline)
                 .fontWeight(.bold)
                 .foregroundStyle(Color.appForeground)
+                .alignmentGuide(VerticalAlignment.center) { d in
+                    d[.firstTextBaseline] / 2
+                }
             Spacer()
         }
         .padding(.horizontal, 24)
