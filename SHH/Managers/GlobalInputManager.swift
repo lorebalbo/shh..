@@ -7,9 +7,10 @@ import Foundation
 /// Escape key presses for recording cancellation.
 ///
 /// Requires Accessibility permission (AXIsProcessTrusted) before the tap
-/// can be installed. The tap runs in active-filter mode (.defaultTap) so
-/// that consumed events (e.g. Space during lock-in, isolated Fn presses)
-/// are suppressed and never reach the focused application or macOS.
+/// can be installed. The tap runs in active-filter mode (.defaultTap) at
+/// the HID level so that consumed events are suppressed before macOS can
+/// process them (e.g. Fn double-tap → emoji picker). Falls back to
+/// session-level tap if the HID tap cannot be created.
 ///
 /// The RunLoop source is added to the main RunLoop, so all callbacks
 /// fire on the main thread.
@@ -17,6 +18,10 @@ final class GlobalInputManager {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var previousFlags: CGEventFlags = []
+
+    /// When `true`, the next Escape keyDown is a synthetic event we posted
+    /// to dismiss the emoji picker — pass it through without consuming.
+    private var passThroughNextEscape = false
 
     /// Modifier keys that must NOT change simultaneously with Fn for the
     /// event to be considered an isolated Fn key event.
@@ -65,14 +70,30 @@ final class GlobalInputManager {
 
         let refcon = Unmanaged.passUnretained(self).toOpaque()
 
-        guard let tap = CGEvent.tapCreate(
+        // Prefer HID-level tap to intercept Fn key events before the system's
+        // emoji picker detection can see them. Fall back to session-level tap
+        // if HID tap creation fails (e.g. insufficient privileges on some
+        // macOS versions).
+        let tap: CFMachPort
+        if let hidTap = CGEvent.tapCreate(
+            tap: .cghidEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: eventMask,
+            callback: globalInputEventTapCallback,
+            userInfo: refcon
+        ) {
+            tap = hidTap
+        } else if let sessionTap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
             options: .defaultTap,
             eventsOfInterest: eventMask,
             callback: globalInputEventTapCallback,
             userInfo: refcon
-        ) else {
+        ) {
+            tap = sessionTap
+        } else {
             return false
         }
 
@@ -146,9 +167,13 @@ final class GlobalInputManager {
         guard diff.intersection(Self.otherModifierMask).isEmpty else { return false }
 
         if currentFlags.contains(.maskSecondaryFn) {
-            return onFnPress?() ?? false
+            let consumed = onFnPress?() ?? false
+            if consumed { scheduleEmojiPickerDismissal() }
+            return consumed
         } else {
-            return onFnRelease?() ?? false
+            let consumed = onFnRelease?() ?? false
+            if consumed { scheduleEmojiPickerDismissal() }
+            return consumed
         }
     }
 
@@ -158,9 +183,56 @@ final class GlobalInputManager {
         case 49: // Space bar
             return onSpacePress?() ?? false
         case 53: // Escape
+            if passThroughNextEscape {
+                passThroughNextEscape = false
+                return false
+            }
             return onEscPress?() ?? false
         default:
             return false
+        }
+    }
+
+    // MARK: - Emoji Picker Safety Net
+
+    /// After each consumed Fn event, check whether macOS opened the emoji
+    /// picker despite our suppression, and dismiss it if so.
+    private func scheduleEmojiPickerDismissal() {
+        // All callbacks fire on the main thread (RunLoop source is on main RunLoop),
+        // so this dispatch is same-thread. Use nonisolated(unsafe) to satisfy the
+        // concurrency checker — same pattern used throughout this codebase.
+        nonisolated(unsafe) let dismiss = self.dismissEmojiPickerIfPresent
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            dismiss()
+        }
+    }
+
+    private func dismissEmojiPickerIfPresent() {
+        guard let windowList = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements],
+            kCGNullWindowID
+        ) as? [[String: Any]] else { return }
+
+        for window in windowList {
+            let ownerName = window[kCGWindowOwnerName as String] as? String ?? ""
+            let windowName = window[kCGWindowName as String] as? String ?? ""
+
+            guard ownerName == "TextInputMenuAgent"
+                || windowName == "Character Palette"
+                || windowName == "Character Viewer"
+                || windowName == "Emoji & Symbols"
+            else { continue }
+
+            // Mark next Escape as synthetic so our handler passes it through
+            passThroughNextEscape = true
+
+            if let escDown = CGEvent(keyboardEventSource: nil, virtualKey: 0x35, keyDown: true) {
+                escDown.post(tap: .cghidEventTap)
+            }
+            if let escUp = CGEvent(keyboardEventSource: nil, virtualKey: 0x35, keyDown: false) {
+                escUp.post(tap: .cghidEventTap)
+            }
+            return
         }
     }
 

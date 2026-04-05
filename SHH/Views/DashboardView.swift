@@ -207,7 +207,9 @@ private struct SidebarRow: View {
                     Text(section.label)
                         .font(.custom("League Spartan", size: 14))
                         .lineLimit(1)
-                        .frame(height: 20, alignment: .center)
+                        .alignmentGuide(VerticalAlignment.center) { d in
+                            d[.firstTextBaseline] / 2
+                        }
                         .transition(.opacity)
                 }
             }
