@@ -6,6 +6,13 @@ struct MenuBarView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
+        Button("Open Dashboard") {
+            openWindow(id: "dashboard")
+            NSApplication.shared.activate(ignoringOtherApps: true)
+        }
+
+        Divider()
+
         Toggle("Launch at Login", isOn: $launchAtLogin)
             .tint(Color.appError)
             .onChange(of: launchAtLogin) { _, newValue in

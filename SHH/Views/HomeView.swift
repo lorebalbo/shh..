@@ -48,9 +48,10 @@ struct HomeView: View {
                 Image(systemName: "magnifyingglass")
                     .font(Font.appCaption)
                     .foregroundStyle(Color.appForeground.opacity(0.4))
-                TextField("", text: $searchText, prompt: Text("Search dictations").foregroundColor(Color.appForeground.opacity(0.4)))
+                TextField("", text: $searchText, prompt: Text("Search dictations").foregroundStyle(Color.appForeground.opacity(0.45)))
                     .font(Font.appCallout)
                     .textFieldStyle(.plain)
+                    .colorScheme(.light) // Forces the system text field to use dark text/placeholder against our light background
                     .foregroundStyle(Color.appForeground)
                 if !searchText.isEmpty {
                     Button {
