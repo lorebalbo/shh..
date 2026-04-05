@@ -295,17 +295,18 @@ private struct ProviderFormSheet: View {
                                     .font(Font.appCaption)
                                     .foregroundStyle(Color.appForeground.opacity(0.5))
                             }
-                            .frame(maxWidth: .infinity)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 10)
-                            .background(Color.appForeground.opacity(0.06))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.12), lineWidth: 1))
+                            .frame(maxWidth: .infinity)
                         }
                         .menuStyle(.borderlessButton)
                         .menuIndicator(.hidden)
-                        .environment(\.colorScheme, .light)
                         .frame(maxWidth: .infinity)
+                        .background(Color.appForeground.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.12), lineWidth: 1))
+                        .contentShape(Rectangle())
+                        .environment(\.colorScheme, .light)
                     }
 
                     // API Key (cloud only)
@@ -399,17 +400,18 @@ private struct ProviderFormSheet: View {
                                         .font(Font.appCaption)
                                         .foregroundStyle(Color.appForeground.opacity(0.5))
                                 }
-                                .frame(maxWidth: .infinity)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 10)
-                                .background(Color.appForeground.opacity(0.06))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.12), lineWidth: 1))
+                                .frame(maxWidth: .infinity)
                             }
                             .menuStyle(.borderlessButton)
                             .menuIndicator(.hidden)
-                            .environment(\.colorScheme, .light)
                             .frame(maxWidth: .infinity)
+                            .background(Color.appForeground.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.12), lineWidth: 1))
+                            .contentShape(Rectangle())
+                            .environment(\.colorScheme, .light)
                         } else {
                             TextField("", text: $modelName)
                                 .focused($focusedField, equals: .modelName)
