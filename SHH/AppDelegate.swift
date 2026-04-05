@@ -52,24 +52,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - App Icon
 
     private func makeAppIcon() -> NSImage {
-        let canvasSize = CGSize(width: 512, height: 512)
+        // 1024×1024 canvas per Apple HIG for macOS Big Sur+ icons.
+        let canvasSize = CGSize(width: 1024, height: 1024)
         let bgColor = NSColor(red: 233 / 255.0, green: 79 / 255.0, blue: 55 / 255.0, alpha: 1.0)
         let fgColor = NSColor(red: 246 / 255.0, green: 247 / 255.0, blue: 235 / 255.0, alpha: 1.0)
 
         return NSImage(size: canvasSize, flipped: false) { rect in
+            // Apple icon grid: squircle inset ~100pt from each edge → 824×824 shape.
+            let iconInset: CGFloat = 100
+            let iconRect = rect.insetBy(dx: iconInset, dy: iconInset)
+            let cornerRadius: CGFloat = 185
+
             bgColor.setFill()
-            NSBezierPath(roundedRect: rect, xRadius: 115, yRadius: 115).fill()
+            NSBezierPath(roundedRect: iconRect, xRadius: cornerRadius, yRadius: cornerRadius).fill()
 
             let config = NSImage.SymbolConfiguration(paletteColors: [fgColor])
             guard let symbol = NSImage(systemSymbolName: "waveform", accessibilityDescription: nil)?
                 .withSymbolConfiguration(config) else { return true }
 
-            let targetHeight = canvasSize.height * 0.42
+            // Waveform at 50% of the icon shape height (slightly larger & more prominent).
+            let targetHeight = iconRect.height * 0.50
             let scale = targetHeight / symbol.size.height
             let scaledWidth = symbol.size.width * scale
             let drawRect = NSRect(
-                x: (canvasSize.width - scaledWidth) / 2,
-                y: (canvasSize.height - targetHeight) / 2,
+                x: iconRect.midX - scaledWidth / 2,
+                y: iconRect.midY - targetHeight / 2,
                 width: scaledWidth,
                 height: targetHeight
             )

@@ -291,19 +291,20 @@ private struct ProviderFormSheet: View {
                                     .font(Font.appBody)
                                     .foregroundStyle(Color.appForeground)
                                 Spacer()
-                                Image(systemName: "chevron.up.chevron.down")
+                                Image(systemName: "chevron.down")
                                     .font(Font.appCaption)
                                     .foregroundStyle(Color.appForeground.opacity(0.5))
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 10)
                             .background(Color.appForeground.opacity(0.06))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.12), lineWidth: 1))
                         }
                         .menuStyle(.borderlessButton)
                         .menuIndicator(.hidden)
+                        .environment(\.colorScheme, .light)
                         .frame(maxWidth: .infinity)
                     }
 
@@ -394,19 +395,20 @@ private struct ProviderFormSheet: View {
                                         .font(Font.appBody)
                                         .foregroundStyle(modelName.isEmpty ? Color.appForeground.opacity(0.4) : Color.appForeground)
                                     Spacer()
-                                    Image(systemName: "chevron.up.chevron.down")
+                                    Image(systemName: "chevron.down")
                                         .font(Font.appCaption)
                                         .foregroundStyle(Color.appForeground.opacity(0.5))
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
+                                .padding(.vertical, 10)
                                 .background(Color.appForeground.opacity(0.06))
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.12), lineWidth: 1))
                             }
                             .menuStyle(.borderlessButton)
                             .menuIndicator(.hidden)
+                            .environment(\.colorScheme, .light)
                             .frame(maxWidth: .infinity)
                         } else {
                             TextField("", text: $modelName)

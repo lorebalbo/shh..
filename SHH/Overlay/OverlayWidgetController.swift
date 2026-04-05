@@ -3,9 +3,51 @@ import SwiftUI
 
 /// Custom NSPanel subclass that never becomes key or main window,
 /// ensuring the user's active application retains focus (ADR Decision 8).
+/// Handles drag-to-move and tap detection at the AppKit level using screen
+/// coordinates — bypassing SwiftUI's DragGesture entirely to avoid the
+/// feedback loop caused by the window moving under the gesture's reference frame.
 final class OverlayPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+
+    /// Called when the user finishes dragging the panel to a new position.
+    var onDragEnded: (() -> Void)?
+    /// Called when the user taps (clicks without dragging) the panel.
+    var onTapped: (() -> Void)?
+
+    private var initialMouseLocation: NSPoint = .zero
+    private var initialOrigin: NSPoint = .zero
+    private var didDrag = false
+
+    /// Intercepts mouse events at the window level so that drag tracking uses
+    /// screen coordinates (NSEvent.mouseLocation) — completely decoupled from
+    /// the window's own position and SwiftUI's coordinate system.
+    override func sendEvent(_ event: NSEvent) {
+        switch event.type {
+        case .leftMouseDown:
+            initialMouseLocation = NSEvent.mouseLocation
+            initialOrigin = frame.origin
+            didDrag = false
+        case .leftMouseDragged:
+            let current = NSEvent.mouseLocation
+            let dx = current.x - initialMouseLocation.x
+            let dy = current.y - initialMouseLocation.y
+            if !didDrag && (abs(dx) > 3 || abs(dy) > 3) {
+                didDrag = true
+            }
+            if didDrag {
+                setFrameOrigin(NSPoint(x: initialOrigin.x + dx, y: initialOrigin.y + dy))
+            }
+        case .leftMouseUp:
+            if didDrag {
+                onDragEnded?()
+            } else {
+                onTapped?()
+            }
+        default:
+            super.sendEvent(event)
+        }
+    }
 }
 
 /// Manages the always-on-top overlay widget displayed as a borderless,
@@ -30,8 +72,6 @@ final class OverlayWidgetController: @unchecked Sendable {
     private let hostingView: NSHostingView<OverlayContentView>
     private let viewModel: OverlayViewModel
     private var screenObserver: NSObjectProtocol?
-    private var dragStartOrigin: NSPoint = .zero
-    private var isDragStarted = false
 
     // MARK: - Init
 
@@ -107,21 +147,8 @@ final class OverlayWidgetController: @unchecked Sendable {
     // MARK: - Drag Handling
 
     private func setupDragHandling() {
-        viewModel.onDragChanged = { [weak self] translation in
-            guard let self else { return }
-            if !self.isDragStarted {
-                self.isDragStarted = true
-                self.dragStartOrigin = self.panel.frame.origin
-            }
-            // SwiftUI global DragGesture Y is inverted relative to AppKit coordinates
-            let newOrigin = NSPoint(
-                x: self.dragStartOrigin.x + translation.width,
-                y: self.dragStartOrigin.y - translation.height
-            )
-            self.panel.setFrameOrigin(newOrigin)
-        }
-
-        viewModel.onDragEnded = { [weak self] in
+        // Drag-end: snap to nearest screen edge and persist position.
+        panel.onDragEnded = { [weak self] in
             guard let self else { return }
             let currentOrigin = self.panel.frame.origin
             let snapped = Self.snappedPosition(
@@ -134,8 +161,20 @@ final class OverlayWidgetController: @unchecked Sendable {
                 self.panel.animator().setFrameOrigin(snapped)
             }
             self.savePosition(snapped)
-            self.dragStartOrigin = .zero
-            self.isDragStarted = false
+        }
+
+        // Tap: visual feedback + forward to viewModel callback.
+        panel.onTapped = { [weak self] in
+            guard let self else { return }
+            withAnimation(.easeInOut(duration: 0.1)) {
+                self.viewModel.tapScale = 0.85
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeInOut(duration: 0.1)) {
+                    self.viewModel.tapScale = 1.0
+                }
+            }
+            self.viewModel.onWidgetTapped?()
         }
     }
 

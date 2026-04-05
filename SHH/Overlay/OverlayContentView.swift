@@ -3,10 +3,10 @@ import SwiftUI
 /// The SwiftUI content view hosted inside the overlay NSPanel.
 /// Displays either an idle indicator or an active waveform animation
 /// based on the current recording state.
+/// All mouse interaction (drag & tap) is handled at the NSPanel level
+/// via sendEvent(_:) to avoid SwiftUI DragGesture coordinate-space issues.
 struct OverlayContentView: View {
     @ObservedObject var viewModel: OverlayViewModel
-    @State private var tapScale: CGFloat = 1.0
-    @State private var isDragging = false
 
     var body: some View {
         ZStack {
@@ -32,32 +32,7 @@ struct OverlayContentView: View {
             }
         }
         .frame(width: 88, height: 22)
-        .scaleEffect(tapScale)
-        .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .gesture(
-            DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                .onChanged { value in
-                    isDragging = true
-                    viewModel.onDragChanged?(value.translation)
-                }
-                .onEnded { _ in
-                    isDragging = false
-                    viewModel.onDragEnded?()
-                }
-        )
-        .onTapGesture {
-            guard !isDragging else { return }
-
-            // Visual feedback
-            withAnimation(.easeInOut(duration: 0.1)) {
-                tapScale = 0.85
-            }
-            withAnimation(.easeInOut(duration: 0.1).delay(0.1)) {
-                tapScale = 1.0
-            }
-
-            viewModel.onWidgetTapped?()
-        }
+        .scaleEffect(viewModel.tapScale)
         .animation(.easeInOut(duration: 0.25), value: viewModel.isRecording)
     }
 }

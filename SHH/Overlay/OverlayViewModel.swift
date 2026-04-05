@@ -9,13 +9,8 @@ final class OverlayViewModel: ObservableObject, @unchecked Sendable {
 
     @Published var isRecording: Bool = false
     @Published var audioLevel: Float = 0.0
+    @Published var tapScale: CGFloat = 1.0
 
     /// Called when the user taps the overlay widget while idle.
     var onWidgetTapped: (() -> Void)?
-
-    /// Called during a drag gesture with the translation delta (dx, dy).
-    var onDragChanged: ((CGSize) -> Void)?
-
-    /// Called when a drag gesture ends.
-    var onDragEnded: (() -> Void)?
 }
