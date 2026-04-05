@@ -305,7 +305,7 @@ private struct ProviderFormSheet: View {
                                 Button("OpenAI") { providerType = .openAI }
                                 Button("Local") { providerType = .local }
                             } label: {
-                                Color.clear
+                                Color.clear.contentShape(Rectangle())
                             }
                             .menuStyle(.borderlessButton)
                             .menuIndicator(.hidden)
@@ -413,7 +413,7 @@ private struct ProviderFormSheet: View {
                                         Button(model) { modelName = model }
                                     }
                                 } label: {
-                                    Color.clear
+                                    Color.clear.contentShape(Rectangle())
                                 }
                                 .menuStyle(.borderlessButton)
                                 .menuIndicator(.hidden)
