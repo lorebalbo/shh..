@@ -129,16 +129,15 @@ private struct SidebarView: View {
                     Button {
                         selection = .home
                     } label: {
-                        HStack(spacing: 0) {
+                        HStack(spacing: 8) {
                             Image(systemName: "waveform")
                                 .font(.system(size: 15))
                                 .frame(width: 24, alignment: .center)
                                 .padding(.leading, 20)
                             Text("Shh...")
-                                .font(Font.appTitle3)
-                                .fontWeight(.bold)
+                                .font(Font.appHeadline)
+                                .fontWeight(.semibold)
                                 .fixedSize()
-                                .padding(.leading, 8)
                         }
                         .foregroundStyle(selection == .home ? Color.appError : Color.appForeground)
                     }
@@ -162,6 +161,7 @@ private struct SidebarView: View {
                 .padding(.trailing, 10)
             }
             .frame(height: 52)
+            .padding(.top, 10)
 
             VStack(alignment: .leading, spacing: 2) {
                 ForEach([SidebarSection.home, SidebarSection.style, SidebarSection.llmProviders]) { section in

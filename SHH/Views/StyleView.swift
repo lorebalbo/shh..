@@ -30,9 +30,9 @@ struct StyleView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack {
+        HStack(alignment: .center) {
             Text("Styles")
-                .font(Font.appTitle3)
+                .font(Font.appHeadline)
                 .fontWeight(.bold)
                 .foregroundStyle(Color.appForeground)
             Spacer()
@@ -49,6 +49,7 @@ struct StyleView: View {
         }
         .padding(.horizontal, 24)
         .frame(height: 52)
+        .padding(.top, 10)
     }
 
     // MARK: - Empty State
