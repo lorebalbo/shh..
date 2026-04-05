@@ -35,7 +35,7 @@ struct OverlayContentView: View {
         .scaleEffect(tapScale)
         .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .gesture(
-            DragGesture()
+            DragGesture(minimumDistance: 0, coordinateSpace: .global)
                 .onChanged { value in
                     isDragging = true
                     viewModel.onDragChanged?(value.translation)
