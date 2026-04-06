@@ -129,20 +129,15 @@ private struct SidebarView: View {
                     Button {
                         selection = .home
                     } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "waveform")
-                                .font(.system(size: 15))
-                                .frame(width: 24, alignment: .center)
-                                .padding(.leading, 20)
-                            Text("Shh...")
-                                .font(Font.appHeadline)
-                                .fontWeight(.semibold)
-                                .fixedSize()
-                                .alignmentGuide(VerticalAlignment.center) { d in
-                                    d[.firstTextBaseline] / 2
-                                }
-                        }
-                        .foregroundStyle(Color.appForeground)
+                        Text("Shh...")
+                            .font(Font.appHeadline)
+                            .fontWeight(.semibold)
+                            .fixedSize()
+                            .alignmentGuide(VerticalAlignment.center) { d in
+                                d[.firstTextBaseline] / 2
+                            }
+                            .padding(.leading, 20)
+                            .foregroundStyle(Color.appForeground)
                     }
                     .buttonStyle(.plain)
                     .transition(.opacity)
