@@ -8,6 +8,7 @@ import Foundation
 final class OverlayViewModel: ObservableObject, @unchecked Sendable {
 
     @Published var isRecording: Bool = false
+    @Published var isProcessing: Bool = false
     @Published var audioLevel: Float = 0.0
     @Published var tapScale: CGFloat = 1.0
 

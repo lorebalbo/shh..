@@ -86,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupRecordingCoordinator() {
+        let vm = overlayViewModel
         let transcriptionPipeline = TranscriptionPipeline()
 
         var textProcessingPipeline: TextProcessingPipeline?
@@ -104,7 +105,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         coordinator.onTranscriptionComplete = { text, mode in
-            // Auto-paste flow will be implemented in MT-5
+            DispatchQueue.main.async {
+                vm.isProcessing = false
+            }
             NotificationCenter.default.post(
                 name: .shhTranscriptionDidComplete,
                 object: nil,
@@ -113,6 +116,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         coordinator.onError = { error in
+            DispatchQueue.main.async {
+                vm.isProcessing = false
+            }
             NotificationCenter.default.post(
                 name: .shhRecordingError,
                 object: nil,
@@ -124,7 +130,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         recordingCoordinator = coordinator
 
         // Bind recording state to overlay
-        let vm = overlayViewModel
         let originalOnStart = coordinator.stateMachine.onRecordingDidStart
         // Capture audioCaptureManager with nonisolated(unsafe) — same pattern used
         // throughout this codebase for non-Sendable final classes.
@@ -141,11 +146,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             originalOnStop?(mode)
             DispatchQueue.main.async {
                 vm.isRecording = false
+                vm.isProcessing = true
             }
         }
         coordinator.stateMachine.onForcedIdle = {
             DispatchQueue.main.async {
                 vm.isRecording = false
+                vm.isProcessing = false
             }
         }
         let originalOnCancel = coordinator.stateMachine.onRecordingDidCancel
@@ -153,6 +160,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             originalOnCancel?()
             DispatchQueue.main.async {
                 vm.isRecording = false
+                vm.isProcessing = false
             }
         }
 
