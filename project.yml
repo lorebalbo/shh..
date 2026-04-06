@@ -24,6 +24,7 @@ targets:
         SWIFT_VERSION: "6.0"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         COMBINE_HIDPI_IMAGES: true
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_HARDENED_RUNTIME: true
         CODE_SIGN_STYLE: Automatic
         SWIFT_OBJC_BRIDGING_HEADER: SHH/SHH-Bridging-Header.h
