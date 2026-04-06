@@ -1,15 +1,27 @@
 import AppKit
 import SwiftUI
 
+/// A minimal non-activating panel for content that needs SwiftUI interactivity.
+/// Unlike OverlayPanel it does NOT intercept mouse events, so SwiftUI buttons
+/// inside receive clicks normally.
+private final class InteractiveOverlayPanel: NSPanel {
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+}
+
 /// Manages the style picker popup panel that appears above the overlay widget
 /// when recording starts. Uses the same non-activating panel pattern as the
 /// main overlay widget to avoid stealing focus.
 /// Conforms to @unchecked Sendable because all mutations happen on the main thread.
 final class StylePickerController: @unchecked Sendable {
 
-    private let panel: OverlayPanel
+    private let panel: InteractiveOverlayPanel
     private let hostingView: NSHostingView<StylePickerView>
     let viewModel: StylePickerViewModel
+
+    /// Tracks whether a hide animation is in progress so that a subsequent
+    /// show() call can cancel the stale orderOut completion.
+    private var pendingHide = false
 
     /// The intrinsic size of the picker content.
     private static let pickerWidth: CGFloat = 180
@@ -24,7 +36,7 @@ final class StylePickerController: @unchecked Sendable {
             size: CGSize(width: Self.pickerWidth, height: Self.estimatedMaxHeight)
         )
 
-        panel = OverlayPanel(
+        panel = InteractiveOverlayPanel(
             contentRect: contentRect,
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -49,6 +61,7 @@ final class StylePickerController: @unchecked Sendable {
 
     /// Shows the picker above (or below) the given widget origin point.
     func show(relativeTo widgetFrame: NSRect) {
+        pendingHide = false // Cancel any in-flight hide completion
         // Size the hosting view to its intrinsic content size
         let fittingSize = hostingView.fittingSize
         let panelSize = CGSize(
@@ -75,12 +88,15 @@ final class StylePickerController: @unchecked Sendable {
 
     /// Hides the picker with a fade-out animation.
     func hide() {
+        pendingHide = true
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.12
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
-            self?.panel.orderOut(nil)
+            guard let self, self.pendingHide else { return }
+            self.pendingHide = false
+            self.panel.orderOut(nil)
         })
     }
 
