@@ -41,3 +41,6 @@ Icon
 
 # XcodeGen specific
 SHH.xcodeproj
+
+*.dmg
+*.txt
