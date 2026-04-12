@@ -8,6 +8,8 @@ struct SettingsView: View {
     @AppStorage("transcriptionLanguage") private var transcriptionLanguage = "auto"
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var showClearHistoryConfirmation = false
+    @State private var pendingDownloadModel: KnownWhisperModel? = nil
+    @State private var modelManager = ModelManager.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -16,6 +18,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     transcriptionSection
+                    whisperModelsSection
                     generalSection
                 }
                 .padding(24)
@@ -91,6 +94,152 @@ struct SettingsView: View {
         .background(Color.appForeground.opacity(0.05))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.1), lineWidth: 1))
+    }
+
+    // MARK: - Whisper Models Section
+
+    private var whisperModelsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Transcription Model", systemImage: "cpu")
+                .font(Font.appHeadline)
+                .foregroundStyle(Color.appForeground)
+
+            VStack(spacing: 0) {
+                ForEach(Array(KnownWhisperModel.catalog.enumerated()), id: \.element.id) { index, model in
+                    if index > 0 {
+                        Divider()
+                            .background(Color.appForeground.opacity(0.08))
+                    }
+                    modelRow(model)
+                }
+            }
+            .background(Color.appForeground.opacity(0.03))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.1), lineWidth: 1))
+        }
+        .padding(16)
+        .background(Color.appForeground.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.1), lineWidth: 1))
+        .confirmationDialog(
+            "Download \(pendingDownloadModel?.displayName ?? "") Model",
+            isPresented: Binding(
+                get: { pendingDownloadModel != nil },
+                set: { if !$0 { pendingDownloadModel = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let model = pendingDownloadModel {
+                Button("Download (\(model.displaySize))") {
+                    modelManager.downloadModel(model)
+                    pendingDownloadModel = nil
+                }
+            }
+            Button("Cancel", role: .cancel) { pendingDownloadModel = nil }
+        } message: {
+            if let model = pendingDownloadModel {
+                Text(
+                    "This will download the \(model.displayName) Whisper model (\(model.displaySize)) from Hugging Face. " +
+                    "Download time depends on your connection speed."
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func modelRow(_ model: KnownWhisperModel) -> some View {
+        let state = modelManager.downloadStates[model.id] ?? .notDownloaded
+        let isActive = modelManager.activeModelId == model.id
+        let isDownloaded = state == .downloaded
+
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(model.displayName)
+                        .font(Font.appBody)
+                        .fontWeight(isActive ? .semibold : .regular)
+                        .foregroundStyle(isDownloaded ? Color.appForeground : Color.appForeground.opacity(0.45))
+                    if model.isMostPowerful {
+                        Text("BEST")
+                            .font(Font.appCaption)
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.appError)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.appError.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                    }
+                }
+                Text(model.description)
+                    .font(Font.appCaption)
+                    .foregroundStyle(
+                        isDownloaded
+                            ? Color.appForeground.opacity(0.5)
+                            : Color.appForeground.opacity(0.3)
+                    )
+            }
+
+            Spacer()
+
+            Text(model.displaySize)
+                .font(Font.appCaption)
+                .foregroundStyle(
+                    isDownloaded
+                        ? Color.appForeground.opacity(0.5)
+                        : Color.appForeground.opacity(0.3)
+                )
+                .monospacedDigit()
+
+            modelRowAction(model: model, state: state, isActive: isActive)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .opacity(isDownloaded ? 1.0 : 0.75)
+    }
+
+    @ViewBuilder
+    private func modelRowAction(model: KnownWhisperModel, state: ModelDownloadState, isActive: Bool) -> some View {
+        switch state {
+        case .downloaded:
+            let isOn = Binding<Bool>(
+                get: { modelManager.activeModelId == model.id },
+                set: { newValue in
+                    if newValue { modelManager.setActiveModel(model) }
+                    // Turning off the active model is not allowed — only switching activates another
+                }
+            )
+            Toggle("", isOn: isOn)
+                .toggleStyle(AppToggleStyle())
+                .labelsHidden()
+
+        case .downloading(let progress):
+            HStack(spacing: 8) {
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .tint(Color.appError)
+                    .frame(width: 56)
+                Button {
+                    modelManager.cancelDownload(model)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.appForeground.opacity(0.4))
+                }
+                .buttonStyle(.plain)
+                .help("Cancel download")
+            }
+
+        case .notDownloaded, .failed(_):
+            Button {
+                pendingDownloadModel = model
+            } label: {
+                Image(systemName: "arrow.down.circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(Color.appForeground.opacity(0.45))
+            }
+            .buttonStyle(.plain)
+            .help("Download \(model.displayName) (\(model.displaySize))")
+        }
     }
 
     // MARK: - General Section
