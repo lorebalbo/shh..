@@ -23,6 +23,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupOverlayWidget()
         wireStylePicker()
 
+        // If any required permission is missing, open the dashboard immediately
+        // so the user can grant access. The overlay widget is not shown until
+        // all permissions have been granted.
+        if !allPermissionsGranted {
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .openDashboardWindow, object: nil)
+                NSApplication.shared.activate(ignoringOtherApps: true)
+            }
+        }
+
         // Retry installing the CGEvent tap whenever the app becomes active.
         // This handles the common case where Accessibility permission is granted
         // after the app has already launched (initial launch without permission).
@@ -35,9 +45,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func retryEventTapIfNeeded() {
+        // Show the overlay widget as soon as all permissions have been granted.
+        if allPermissionsGranted {
+            overlayController?.show()
+        }
         guard let coordinator = recordingCoordinator,
               !coordinator.inputManager.isRunning else { return }
         coordinator.start()
+    }
+
+    /// Returns true when every permission required by the app has been granted.
+    /// Mirrors `PermissionManager.allPermissionsGranted` but is callable from
+    /// any context without actor-isolation concerns.
+    private var allPermissionsGranted: Bool {
+        AXIsProcessTrusted()
+            && AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -176,7 +198,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = OverlayWidgetController(viewModel: overlayViewModel)
         let pickerController = StylePickerController(viewModel: stylePickerViewModel)
 
-        controller.show()
+        // Only show the widget immediately if all permissions are already granted.
+        // Otherwise it will be shown by retryEventTapIfNeeded once the user grants
+        // the missing permissions and returns to the app.
+        if allPermissionsGranted {
+            controller.show()
+        }
         overlayController = controller
         stylePickerController = pickerController
     }
