@@ -281,7 +281,7 @@ private struct DictationEntryRow: View {
                 Button {
                     withAnimation(.easeInOut(duration: 0.18)) { showingRaw = false }
                 } label: {
-                    Image(systemName: "wand.and.stars")
+                    Image(systemName: "sparkles")
                         .font(.system(size: 15, weight: .regular))
                         .foregroundStyle(!showingRaw && hasProcessed || isWandHovered
                             ? Color.appError
@@ -302,7 +302,7 @@ private struct DictationEntryRow: View {
                 Button {
                     withAnimation(.easeInOut(duration: 0.18)) { showingRaw = true }
                 } label: {
-                    Image(systemName: "text.alignleft")
+                    Image(systemName: "doc.text")
                         .font(.system(size: 15, weight: .regular))
                         .foregroundStyle(showingRaw || !hasProcessed || isRawHovered
                             ? Color.appError
@@ -321,7 +321,7 @@ private struct DictationEntryRow: View {
 
                 // Delete
                 Button(action: deleteEntry) {
-                    Image(systemName: "trash")
+                    Image(systemName: "minus.circle")
                         .font(.system(size: 15, weight: .regular))
                         .foregroundStyle(isTrashHovered ? Color.appError : Color.appForeground.opacity(0.35))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
