@@ -27,6 +27,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
     case home
     case style
     case llmProviders
+    case whisper
     case settings
     case help
 
@@ -37,6 +38,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         case .home: "Home"
         case .style: "Style"
         case .llmProviders: "Providers"
+        case .whisper: "Whisper"
         case .settings: "Settings"
         case .help: "Help"
         }
@@ -47,6 +49,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         case .home: "house"
         case .style: "paintbrush"
         case .llmProviders: "brain"
+        case .whisper: "cpu"
         case .settings: "gearshape"
         case .help: "questionmark.circle"
         }
@@ -107,6 +110,8 @@ private struct DashboardContentView: View {
             StyleView()
         case .llmProviders:
             LLMProvidersView()
+        case .whisper:
+            WhisperModelsView()
         case .settings:
             SettingsView()
         case .help:
@@ -161,7 +166,7 @@ private struct SidebarView: View {
             .frame(height: 52)
 
             VStack(alignment: .leading, spacing: 2) {
-                ForEach([SidebarSection.home, SidebarSection.style, SidebarSection.llmProviders]) { section in
+                ForEach([SidebarSection.home, SidebarSection.style, SidebarSection.llmProviders, SidebarSection.whisper]) { section in
                     SidebarRow(section: section, isSelected: selection == section, isCollapsed: collapsed) {
                         selection = section
                     }
