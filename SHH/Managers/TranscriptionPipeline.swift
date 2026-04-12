@@ -97,4 +97,11 @@ final class TranscriptionPipeline {
         transcriber = nil
         loadedModelPath = nil
     }
+
+    /// Releases the whisper context immediately so ggml-metal resources are
+    /// torn down before the C++ static destructors run during `exit()`.
+    func shutdown() {
+        transcriber = nil
+        loadedModelPath = nil
+    }
 }

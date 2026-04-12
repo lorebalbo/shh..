@@ -61,6 +61,18 @@ final class RecordingCoordinator {
         inputManager.stop()
     }
 
+    /// Tears down all resources synchronously. Must be called before app exit
+    /// to ensure the whisper context (and ggml-metal resources) are freed
+    /// before C++ static destructors run during `exit()`.
+    func shutdown() {
+        inputManager.stop()
+        _ = audioCaptureManager.stopRecording()
+        // Drain any in-flight transcription so the WhisperTranscriber has no
+        // active callers before we release it.
+        processingQueue.sync {}
+        transcriptionPipeline.shutdown()
+    }
+
     /// Enters lock-in recording mode directly (e.g., from overlay widget tap).
     func startLockIn() {
         stateMachine.startLockIn()
