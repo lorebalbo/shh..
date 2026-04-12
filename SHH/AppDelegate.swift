@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import Combine
 import SwiftData
+import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var recordingCoordinator: RecordingCoordinator?
@@ -11,6 +12,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let stylePickerViewModel = StylePickerViewModel()
     private var audioLevelCancellable: AnyCancellable?
     var modelContainer: ModelContainer?
+
+    // Dashboard window managed directly via AppKit for reliable lifecycle control.
+    private var dashboardWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.applicationIconImage = makeAppIcon()
@@ -23,14 +27,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupOverlayWidget()
         wireStylePicker()
 
-        // If any required permission is missing, open the dashboard immediately
-        // so the user can grant access. The overlay widget is not shown until
-        // all permissions have been granted.
+        // Build the dashboard window. PermissionManager is @MainActor so it must
+        // be created here (applicationDidFinishLaunching is @MainActor via the
+        // NSApplicationDelegate protocol).
+        if let container = modelContainer {
+            let permissionManager = PermissionManager()
+            let rootView = DashboardView()
+                .environment(permissionManager)
+                .modelContainer(container)
+
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 800, height: 550),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                backing: .buffered,
+                defer: false
+            )
+            window.contentView = NSHostingView(rootView: rootView)
+            window.center()
+            window.isReleasedWhenClosed = false
+            window.minSize = NSSize(width: 700, height: 500)
+            window.title = "Shh.."
+            dashboardWindow = window
+        }
+
+        // Open the dashboard immediately when any permission is missing.
         if !allPermissionsGranted {
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(name: .openDashboardWindow, object: nil)
-                NSApplication.shared.activate(ignoringOtherApps: true)
-            }
+            showDashboard()
         }
 
         // Retry installing the CGEvent tap whenever the app becomes active.
@@ -40,6 +62,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self,
             selector: #selector(retryEventTapIfNeeded),
             name: NSApplication.didBecomeActiveNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleOpenDashboard),
+            name: .openDashboardWindow,
             object: nil
         )
     }
@@ -54,9 +83,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.start()
     }
 
+    @objc private func handleOpenDashboard() {
+        showDashboard()
+    }
+
     /// Returns true when every permission required by the app has been granted.
-    /// Mirrors `PermissionManager.allPermissionsGranted` but is callable from
-    /// any context without actor-isolation concerns.
     private var allPermissionsGranted: Bool {
         AXIsProcessTrusted()
             && AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
@@ -71,8 +102,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        NotificationCenter.default.post(name: .openDashboardWindow, object: nil)
+        showDashboard()
         return true
+    }
+
+    func showDashboard() {
+        dashboardWindow?.makeKeyAndOrderFront(nil)
+        NSApplication.shared.activate(ignoringOtherApps: true)
     }
 
     // MARK: - App Icon

@@ -2,13 +2,11 @@ import ServiceManagement
 import SwiftUI
 
 struct MenuBarView: View {
-    @Environment(\.openWindow) private var openWindow
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         Button("Open Dashboard") {
-            openWindow(id: "dashboard")
-            NSApplication.shared.activate(ignoringOtherApps: true)
+            NotificationCenter.default.post(name: .openDashboardWindow, object: nil)
         }
 
         Divider()
@@ -34,9 +32,5 @@ struct MenuBarView: View {
             NSApplication.shared.terminate(nil)
         }
         .keyboardShortcut("q")
-        .onReceive(NotificationCenter.default.publisher(for: .openDashboardWindow)) { _ in
-            openWindow(id: "dashboard")
-            NSApplication.shared.activate(ignoringOtherApps: true)
-        }
     }
 }

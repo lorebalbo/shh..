@@ -4,7 +4,6 @@ import SwiftUI
 @main
 struct SHHApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @State private var permissionManager = PermissionManager()
 
     let modelContainer: ModelContainer
 
@@ -34,12 +33,5 @@ struct SHHApp: App {
             MenuBarView()
         }
         .modelContainer(modelContainer)
-
-        Window("", id: "dashboard") {
-            DashboardView()
-                .environment(permissionManager)
-        }
-        .modelContainer(modelContainer)
-        .defaultSize(width: 800, height: 550)
     }
 }
