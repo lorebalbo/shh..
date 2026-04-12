@@ -49,7 +49,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         case .home: "house"
         case .style: "paintbrush"
         case .llmProviders: "brain"
-        case .whisper: "waveform"
+        case .whisper: "cpu"
         case .settings: "gearshape"
         case .help: "questionmark.circle"
         }

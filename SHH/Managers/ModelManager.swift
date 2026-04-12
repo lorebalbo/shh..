@@ -125,7 +125,6 @@ final class ModelManager: @unchecked Sendable {
     static let bundledModelName = "ggml-base.bin"
 
     private static let activeModelIdKey = "activeWhisperModelId"
-    private static let hasAutoDownloadedLargeKey = "hasAutoDownloadedLargeModel"
 
     private let userModelsDirectoryName = "models"
     private let appSupportDirectoryName = "SHH"
@@ -152,19 +151,22 @@ final class ModelManager: @unchecked Sendable {
 
     private init() {
         let savedId = UserDefaults.standard.string(forKey: Self.activeModelIdKey)
-        activeModelId = savedId ?? KnownWhisperModel.catalog.first(where: { $0.isMostPowerful })?.id ?? "base"
+
+        // Validate: only restore a saved model ID if that model is actually on disk.
+        // Otherwise fall back to the bundled base model so the UI is never inconsistent.
+        if let savedId,
+           let model = KnownWhisperModel.catalog.first(where: { $0.id == savedId }),
+           Self.checkIsOnDiskStatic(model, bundledPath: Bundle.main.path(forResource: "ggml-base", ofType: "bin")) {
+            activeModelId = savedId
+        } else {
+            activeModelId = "base"
+            if savedId != nil {
+                UserDefaults.standard.removeObject(forKey: Self.activeModelIdKey)
+            }
+        }
 
         for model in KnownWhisperModel.catalog {
             downloadStates[model.id] = checkIsOnDisk(model) ? .downloaded : .notDownloaded
-        }
-
-        // Automatically download the most powerful model on first launch.
-        if !UserDefaults.standard.bool(forKey: Self.hasAutoDownloadedLargeKey) {
-            UserDefaults.standard.set(true, forKey: Self.hasAutoDownloadedLargeKey)
-            if let largeModel = KnownWhisperModel.catalog.first(where: { $0.isMostPowerful }),
-               !checkIsOnDisk(largeModel) {
-                startDownload(largeModel)
-            }
         }
     }
 
@@ -193,8 +195,16 @@ final class ModelManager: @unchecked Sendable {
     }
 
     private func checkIsOnDisk(_ model: KnownWhisperModel) -> Bool {
-        if model.id == "base", bundledModelPath() != nil { return true }
-        let path = userModelsDirectory.appendingPathComponent(model.fileName).path
+        Self.checkIsOnDiskStatic(model, bundledPath: bundledModelPath())
+    }
+
+    private static func checkIsOnDiskStatic(_ model: KnownWhisperModel, bundledPath: String?) -> Bool {
+        if model.id == "base" { return bundledPath != nil }
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let path = appSupport
+            .appendingPathComponent("SHH")
+            .appendingPathComponent("models")
+            .appendingPathComponent(model.fileName).path
         return FileManager.default.fileExists(atPath: path)
     }
 
