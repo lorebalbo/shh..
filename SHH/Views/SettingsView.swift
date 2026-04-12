@@ -39,7 +39,6 @@ struct SettingsView: View {
         }
         .padding(.horizontal, 24)
         .frame(height: 52)
-        .padding(.top, 10)
     }
 
     // MARK: - Transcription Section

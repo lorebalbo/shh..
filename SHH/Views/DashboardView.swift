@@ -159,7 +159,6 @@ private struct SidebarView: View {
                 .padding(.trailing, 10)
             }
             .frame(height: 52)
-            .padding(.top, 10)
 
             VStack(alignment: .leading, spacing: 2) {
                 ForEach([SidebarSection.home, SidebarSection.style, SidebarSection.llmProviders]) { section in
@@ -265,7 +264,6 @@ struct HelpView: View {
         }
         .padding(.horizontal, 24)
         .frame(height: 52)
-        .padding(.top, 10)
     }
 
     private var gettingStartedSection: some View {
