@@ -6,7 +6,9 @@ import AVFoundation
 struct HomeView: View {
     @Query(sort: \DictationEntry.timestamp, order: .reverse) private var entries: [DictationEntry]
     @State private var searchText = ""
+    #if DEBUG
     @AppStorage("showDiagnostics") private var showDiagnostics = false
+    #endif
 
     private var filteredEntries: [DictationEntry] {
         if searchText.isEmpty { return entries }
@@ -26,8 +28,10 @@ struct HomeView: View {
             } else {
                 entryList
             }
+            #if DEBUG
             Divider()
             diagnosticPanel
+            #endif
         }
         .background(Color.appBackground)
     }
@@ -101,6 +105,7 @@ struct HomeView: View {
 
     // MARK: - Diagnostic Log
 
+    #if DEBUG
     private var diagnosticPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
@@ -179,6 +184,7 @@ struct HomeView: View {
         case .error: return .red
         }
     }
+    #endif
 
     // MARK: - Entry List
 
