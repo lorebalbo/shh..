@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let overlayViewModel = OverlayViewModel()
     private let stylePickerViewModel = StylePickerViewModel()
     private var audioLevelCancellable: AnyCancellable?
+    private var styleChangeObserver: NSObjectProtocol?
     var modelContainer: ModelContainer?
 
     // Dashboard window managed directly via AppKit for reliable lifecycle control.
@@ -26,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupRecordingCoordinator()
         setupOverlayWidget()
         wireStylePicker()
+        observeStyleChanges()
 
         // Build the dashboard window. PermissionManager is @MainActor so it must
         // be created here (applicationDidFinishLaunching is @MainActor via the
@@ -87,6 +89,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         showDashboard()
     }
 
+    private func observeStyleChanges() {
+        styleChangeObserver = NotificationCenter.default.addObserver(
+            forName: .shhStylesDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.reloadStylePickerFromStore()
+        }
+    }
+
+    private func reloadStylePickerFromStore() {
+        guard let container = modelContainer else { return }
+        let context = ModelContext(container)
+        stylePickerViewModel.reload(from: context)
+
+        guard let pickerController = stylePickerController,
+              pickerController.isVisible,
+              let overlayController = overlayController else { return }
+
+        pickerController.updatePosition(relativeTo: overlayController.panelWindow.frame)
+    }
+
     /// Returns true when every permission required by the app has been granted.
     private var allPermissionsGranted: Bool {
         AXIsProcessTrusted()
@@ -98,6 +122,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        if let styleChangeObserver {
+            NotificationCenter.default.removeObserver(styleChangeObserver)
+        }
         recordingCoordinator?.shutdown()
     }
 
@@ -266,7 +293,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             for style in allStyles {
                 style.isActive = (style.id == selectedId)
             }
-            try? context.save()
+            do {
+                try context.save()
+                NotificationCenter.default.post(name: .shhStylesDidChange, object: nil)
+            } catch {
+            }
         }
 
         // Show/hide picker with recording

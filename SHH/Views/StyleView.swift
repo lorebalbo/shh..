@@ -98,12 +98,26 @@ struct StyleView: View {
         if style.isActive {
             style.isActive = false
         } else {
-            try? style.activate(in: modelContext)
+            do {
+                try style.activate(in: modelContext)
+            } catch {
+                return
+            }
         }
+        saveStyleChanges()
     }
 
     private func deleteStyle(_ style: Style) {
         modelContext.delete(style)
+        saveStyleChanges()
+    }
+
+    private func saveStyleChanges() {
+        do {
+            try modelContext.save()
+            NotificationCenter.default.post(name: .shhStylesDidChange, object: nil)
+        } catch {
+        }
     }
 }
 
@@ -344,6 +358,12 @@ private struct StyleFormSheet: View {
             style.name = trimmedName
             style.systemPrompt = trimmedPrompt
         }
-        dismiss()
+
+        do {
+            try modelContext.save()
+            NotificationCenter.default.post(name: .shhStylesDidChange, object: nil)
+            dismiss()
+        } catch {
+        }
     }
 }

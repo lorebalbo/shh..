@@ -28,3 +28,7 @@ final class Style {
         self.isActive = true
     }
 }
+
+extension Notification.Name {
+    static let shhStylesDidChange = Notification.Name("shhStylesDidChange")
+}

@@ -8,11 +8,17 @@ struct StyleItem: Identifiable {
     let name: String
 }
 
+enum StylePickerPlacement: Equatable {
+    case aboveWidget
+    case belowWidget
+}
+
 /// View model for the style picker popup. Manages the list of available styles
 /// and the currently active style for the recording session.
 final class StylePickerViewModel: ObservableObject, @unchecked Sendable {
     @Published var styles: [StyleItem] = []
     @Published var activeStyleId: UUID?
+    @Published var placement: StylePickerPlacement = .aboveWidget
 
     /// Called when the user selects a style (or nil for "No Style").
     var onStyleSelected: ((UUID?) -> Void)?

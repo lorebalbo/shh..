@@ -23,17 +23,18 @@ final class StylePickerController: @unchecked Sendable {
     /// show() call can cancel the stale orderOut completion.
     private var pendingHide = false
 
-    /// The intrinsic size of the picker content.
-    private static let pickerWidth: CGFloat = 180
-    /// Estimated row height × max visible styles + padding. Actual height determined by content.
-    private static let estimatedMaxHeight: CGFloat = 300
+    private static let edgeGap: CGFloat = 4
+    private static let screenMargin: CGFloat = 8
 
     init(viewModel: StylePickerViewModel) {
         self.viewModel = viewModel
 
         let contentRect = NSRect(
             origin: .zero,
-            size: CGSize(width: Self.pickerWidth, height: Self.estimatedMaxHeight)
+            size: CGSize(
+                width: StylePickerMetrics.width,
+                height: StylePickerMetrics.panelHeight(styleCount: viewModel.styles.count)
+            )
         )
 
         panel = InteractiveOverlayPanel(
@@ -62,20 +63,7 @@ final class StylePickerController: @unchecked Sendable {
     /// Shows the picker above (or below) the given widget origin point.
     func show(relativeTo widgetFrame: NSRect) {
         pendingHide = false // Cancel any in-flight hide completion
-        // Size the hosting view to its intrinsic content size
-        let fittingSize = hostingView.fittingSize
-        let panelSize = CGSize(
-            width: max(fittingSize.width, Self.pickerWidth),
-            height: fittingSize.height
-        )
-
-        // Position above the widget, centered horizontally
-        let x = widgetFrame.midX - panelSize.width / 2
-        // 6pt gap between widget top and picker bottom (the tail bridges the gap visually)
-        let y = widgetFrame.maxY + 4
-
-        let origin = NSPoint(x: x, y: y)
-        panel.setFrame(NSRect(origin: origin, size: panelSize), display: true)
+        applyFrame(relativeTo: widgetFrame)
         panel.alphaValue = 0
         panel.orderFrontRegardless()
 
@@ -102,17 +90,82 @@ final class StylePickerController: @unchecked Sendable {
 
     /// Updates the picker position to track the widget if it moves.
     func updatePosition(relativeTo widgetFrame: NSRect) {
-        let fittingSize = hostingView.fittingSize
-        let panelSize = CGSize(
-            width: max(fittingSize.width, Self.pickerWidth),
-            height: fittingSize.height
-        )
-        let x = widgetFrame.midX - panelSize.width / 2
-        let y = widgetFrame.maxY + 4
-        panel.setFrame(NSRect(origin: NSPoint(x: x, y: y), size: panelSize), display: true)
+        applyFrame(relativeTo: widgetFrame)
     }
 
     var isVisible: Bool {
         panel.isVisible
+    }
+
+    private func applyFrame(relativeTo widgetFrame: NSRect) {
+        let nextFrame = panelFrame(relativeTo: widgetFrame)
+        hostingView.frame = NSRect(origin: .zero, size: nextFrame.size)
+        hostingView.needsLayout = true
+        panel.setFrame(nextFrame, display: true)
+    }
+
+    private func panelFrame(relativeTo widgetFrame: NSRect) -> NSRect {
+        let preferredSize = CGSize(
+            width: StylePickerMetrics.width,
+            height: StylePickerMetrics.panelHeight(styleCount: viewModel.styles.count)
+        )
+
+        guard let visibleFrame = screen(containing: widgetFrame)?.visibleFrame else {
+            let origin = NSPoint(
+                x: widgetFrame.midX - preferredSize.width / 2,
+                y: widgetFrame.maxY + Self.edgeGap
+            )
+            return NSRect(origin: origin, size: preferredSize)
+        }
+
+        let availableAbove = max(
+            visibleFrame.maxY - Self.screenMargin - widgetFrame.maxY - Self.edgeGap,
+            0
+        )
+        let availableBelow = max(
+            widgetFrame.minY - Self.edgeGap - visibleFrame.minY - Self.screenMargin,
+            0
+        )
+        let placement: StylePickerPlacement = availableAbove >= preferredSize.height || availableAbove >= availableBelow
+            ? .aboveWidget
+            : .belowWidget
+
+        if viewModel.placement != placement {
+            viewModel.placement = placement
+        }
+
+        let availableHeight = placement == .aboveWidget ? availableAbove : availableBelow
+        let panelHeight = min(
+            preferredSize.height,
+            max(availableHeight, StylePickerMetrics.minimumPanelHeight)
+        )
+        let panelSize = CGSize(width: preferredSize.width, height: panelHeight)
+
+        let originX = Self.clamped(
+            widgetFrame.midX - panelSize.width / 2,
+            lowerBound: visibleFrame.minX + Self.screenMargin,
+            upperBound: visibleFrame.maxX - panelSize.width - Self.screenMargin
+        )
+        let unclampedOriginY = placement == .aboveWidget
+            ? widgetFrame.maxY + Self.edgeGap
+            : widgetFrame.minY - Self.edgeGap - panelSize.height
+        let originY = Self.clamped(
+            unclampedOriginY,
+            lowerBound: visibleFrame.minY + Self.screenMargin,
+            upperBound: visibleFrame.maxY - panelSize.height - Self.screenMargin
+        )
+
+        return NSRect(origin: NSPoint(x: originX, y: originY), size: panelSize)
+    }
+
+    private func screen(containing rect: NSRect) -> NSScreen? {
+        NSScreen.screens.first { screen in
+            screen.visibleFrame.intersects(rect)
+        } ?? NSScreen.main
+    }
+
+    private static func clamped(_ value: CGFloat, lowerBound: CGFloat, upperBound: CGFloat) -> CGFloat {
+        guard lowerBound <= upperBound else { return lowerBound }
+        return min(max(value, lowerBound), upperBound)
     }
 }
