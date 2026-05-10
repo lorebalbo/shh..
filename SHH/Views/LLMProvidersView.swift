@@ -120,7 +120,6 @@ private struct ProviderRow: View {
     private var providerLabel: String {
         switch provider.providerType {
         case .openAI: "OpenAI"
-        case .anthropic: "Anthropic"
         case .local: "Local"
         }
     }
@@ -214,7 +213,7 @@ private struct ProviderFormSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
-    @State private var providerType: LLMProviderType = .anthropic
+    @State private var providerType: LLMProviderType = .openAI
     @State private var apiKey: String = ""
     @State private var endpointURL: String = ""
     @State private var modelName: String = ""
@@ -234,7 +233,6 @@ private struct ProviderFormSheet: View {
 
     private var providerTypeLabel: String {
         switch providerType {
-        case .anthropic: "Anthropic"
         case .openAI: "OpenAI"
         case .local: "Local"
         }
@@ -284,7 +282,6 @@ private struct ProviderFormSheet: View {
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.appForeground.opacity(0.7))
                         Menu {
-                            Button("Anthropic") { providerType = .anthropic }
                             Button("OpenAI") { providerType = .openAI }
                             Button("Local") { providerType = .local }
                         } label: {
@@ -361,26 +358,24 @@ private struct ProviderFormSheet: View {
                                 .fontWeight(.semibold)
                                 .foregroundStyle(Color.appForeground.opacity(0.7))
                             Spacer()
-                            if providerType != .anthropic {
-                                Button {
-                                    Task { await fetchModels() }
-                                } label: {
-                                    HStack(spacing: 4) {
-                                        if isLoadingModels {
-                                            ProgressView()
-                                                .controlSize(.small)
-                                        } else {
-                                            Image(systemName: "arrow.clockwise")
-                                                .font(Font.appCaption)
-                                        }
-                                        Text("Fetch Models")
+                            Button {
+                                Task { await fetchModels() }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    if isLoadingModels {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                    } else {
+                                        Image(systemName: "arrow.clockwise")
                                             .font(Font.appCaption)
                                     }
-                                    .foregroundStyle(Color.appError)
+                                    Text("Fetch Models")
+                                        .font(Font.appCaption)
                                 }
-                                .buttonStyle(.plain)
-                                .disabled(isLoadingModels)
+                                .foregroundStyle(Color.appError)
                             }
+                            .buttonStyle(.plain)
+                            .disabled(isLoadingModels)
                         }
                         if !availableModels.isEmpty {
                             Menu {
@@ -469,45 +464,35 @@ private struct ProviderFormSheet: View {
                 endpointURL = config.endpointURL
                 modelName = config.modelName
             }
-            if providerType == .anthropic {
-                availableModels = Self.anthropicModels
-                if modelName.isEmpty, let first = availableModels.first {
-                    modelName = first
-                }
-            }
         }
         .onChange(of: providerType) { _, newType in
-            if newType == .anthropic {
-                availableModels = Self.anthropicModels
-                modelName = availableModels.first ?? ""
-            } else {
-                availableModels = []
-                modelName = ""
+            availableModels = []
+            modelName = ""
+            if newType == .local && endpointURL.isEmpty {
+                endpointURL = "http://localhost:1234/v1"
             }
+            Task { await fetchModels() }
         }
     }
-
-    private static let anthropicModels = [
-        "claude-sonnet-4-20250514",
-        "claude-3-5-haiku-20241022",
-        "claude-3-opus-20240229"
-    ]
 
     private func fetchModels() async {
         isLoadingModels = true
         defer { isLoadingModels = false }
 
-        let baseURL: String
+        let rawBase: String
         switch providerType {
         case .openAI:
-            baseURL = endpointURL.isEmpty ? "https://api.openai.com" : endpointURL
+            rawBase = endpointURL.isEmpty ? "https://api.openai.com" : endpointURL
         case .local:
-            baseURL = endpointURL.isEmpty ? "http://localhost:1234" : endpointURL
-        case .anthropic:
-            return
+            rawBase = endpointURL.isEmpty ? "http://localhost:1234/v1" : endpointURL
         }
 
-        let urlString = baseURL.hasSuffix("/") ? "\(baseURL)v1/models" : "\(baseURL)/v1/models"
+        // Normalize: strip trailing slashes and any /v1 suffix so we don't
+        // end up with /v1/v1/models when the user pastes a full base URL.
+        var base = rawBase
+        while base.hasSuffix("/") { base = String(base.dropLast()) }
+        if base.hasSuffix("/v1") { base = String(base.dropLast(3)) }
+        let urlString = "\(base)/v1/models"
         guard let url = URL(string: urlString) else { return }
 
         var request = URLRequest(url: url)

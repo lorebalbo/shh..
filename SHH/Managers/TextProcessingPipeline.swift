@@ -53,7 +53,6 @@ final class TextProcessingPipeline {
 
         let resolvedURL: String
         switch activeProvider.providerType {
-        case .anthropic: resolvedURL = activeProvider.endpointURL.isEmpty ? "https://api.anthropic.com" : activeProvider.endpointURL
         case .openAI:    resolvedURL = activeProvider.endpointURL.isEmpty ? "https://api.openai.com" : activeProvider.endpointURL
         case .local:     resolvedURL = activeProvider.endpointURL
         }
@@ -92,12 +91,6 @@ final class TextProcessingPipeline {
 
     private func buildProvider(from config: LLMProviderConfig) -> LLMProvider {
         switch config.providerType {
-        case .anthropic:
-            return AnthropicAdapter(
-                baseURL: config.endpointURL.isEmpty ? "https://api.anthropic.com" : config.endpointURL,
-                apiKey: config.apiKey,
-                modelName: config.modelName
-            )
         case .openAI:
             return LLMClient(
                 baseURL: config.endpointURL.isEmpty ? "https://api.openai.com" : config.endpointURL,

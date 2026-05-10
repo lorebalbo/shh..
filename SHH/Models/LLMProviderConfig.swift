@@ -3,7 +3,6 @@ import SwiftData
 
 enum LLMProviderType: String, Codable {
     case openAI
-    case anthropic
     case local
 }
 
