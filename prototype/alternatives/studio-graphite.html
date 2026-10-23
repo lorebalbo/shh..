@@ -1,0 +1,1903 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shh.. · Studio Graphite</title>
+<!--
+  "Graphite", the chosen redesign direction: warm graphite greys, a labeled sidebar with a live status line,
+  Inter throughout, airier spacing, and an always-visible "…" menu on every row (also on right-click).
+  Open directly (`open prototype/alternatives/studio-graphite.html`).
+  Deep links: #home, #styles, #providers, #speech, #settings, #help.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&display=swap">
+<style>
+:root {
+  /* Warm graphite: dark greys with a hint of the brand's Desert Sand, never pure black */
+  --bg: #1b1a19;
+  --side: #151413;
+  --raised: #2b2927;
+  --text: #f1eee8;            /* 15.0:1 on --bg */
+  --text-2: #b4aea5;          /* 7.9:1 */
+  --text-3: #9c958c;          /* 5.9:1, meta only */
+  --hair: rgba(241, 238, 232, .08);
+  --hover: rgba(241, 238, 232, .035);
+  --fill: rgba(241, 238, 232, .065);
+  --fill-hover: rgba(241, 238, 232, .1);
+  --selected: rgba(241, 238, 232, .075);
+  --off: rgba(241, 238, 232, .22);
+  --accent: #f26a4b;          /* brand Spice #E94F37 lifted for dark: 5.7:1 on --bg */
+  --accent-hover: #f47c60;
+  --on-accent: #1c0e0a;
+  --ring: rgba(241, 238, 232, .62);
+
+  --sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  min-height: 100vh;
+  background: #d9d8d4;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, textarea { font: inherit; color: inherit; }
+button { margin: 0; padding: 0; border: 0; background: none; text-align: inherit; cursor: pointer; }
+button:disabled { cursor: default; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ───────────── Stage (not part of the app) ───────────── */
+
+.stage {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 48px 24px;
+}
+
+/* ───────────── Window ───────────── */
+
+.window {
+  position: relative;
+  flex: none;
+  width: 800px;
+  height: 550px;
+  min-width: 700px;
+  min-height: 500px;
+  resize: both;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .55), 0 28px 70px rgba(0, 0, 0, .28), 0 6px 18px rgba(0, 0, 0, .14);
+}
+.window::after {   /* the 1px inner highlight macOS draws on dark windows */
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
+  pointer-events: none;
+}
+
+.app {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  background: var(--bg);
+  color: var(--text);
+  color-scheme: dark;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  font-feature-settings: "cv05", "cv08";
+}
+.app ::selection { background: rgba(242, 106, 75, .35); }
+.app :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+[data-input="pointer"] .app :focus-visible { outline: none; }
+.i { flex: none; display: block; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ───────────── Sidebar ───────────── */
+
+.side {
+  flex: none;
+  width: 188px;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 10px 14px;
+  background: var(--side);
+}
+.lights { display: flex; gap: 8px; padding-left: 8px; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 .5px rgba(0, 0, 0, .25); }
+.lights i:nth-child(1) { background: #ff5f57; }
+.lights i:nth-child(2) { background: #febc2e; }
+.lights i:nth-child(3) { background: #28c840; }
+.brand {
+  align-self: flex-start;
+  margin: 24px 0 0 10px;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -.02em;
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 4px;
+}
+.nav { display: flex; flex-direction: column; gap: 2px; }
+.nav-top { margin-top: 20px; }
+.nav-gap { height: 16px; }
+.nav-bottom { margin-top: auto; }
+.nav-row {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: 13.5px;
+  color: var(--text-2);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color .12s, color .12s;
+}
+.nav-row .i { color: var(--text-3); transition: color .12s; }
+.nav-row:hover { background: var(--hover); color: var(--text); }
+.nav-row:hover .i { color: var(--text-2); }
+.nav-row[aria-current="page"] { background: var(--selected); color: var(--text); font-weight: 500; }
+.nav-row[aria-current="page"] .i { color: var(--accent); }
+
+.side-status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 18px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  text-decoration: none;
+  transition: background-color .12s;
+}
+.side-status:hover { background: var(--hover); }
+.status-line { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 500; color: var(--text); }
+.status-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.status-hint { font-weight: 400; color: var(--text-2); }
+.status-line kbd { font-size: 10.5px; line-height: 16px; min-width: 18px; padding: 0 4px; }
+.status-model { padding-left: 14px; font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-status.is-off .status-dot { background: none; box-shadow: inset 0 0 0 1.5px var(--text-3); }
+.side-status.is-off .status-line { color: var(--text-2); }
+
+/* ───────────── Page frame ───────────── */
+
+.content { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.head {
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 16px;
+  margin: 38px 44px 0;
+}
+.head h1 { grid-column: 1; margin: 0; font-size: 27px; font-weight: 600; line-height: 34px; letter-spacing: -.02em; }
+.head-actions { grid-column: 2; display: flex; align-items: center; gap: 10px; }
+.sub { grid-column: 1 / -1; margin: 4px 0 0; max-width: 64ch; color: var(--text-2); line-height: 21px; }
+.scroll { flex: 1; min-height: 0; overflow: auto; padding: 28px 44px 64px; }
+.inner { max-width: 680px; }
+
+/* ───────────── Shared controls ───────────── */
+
+kbd, .kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: rgba(241, 238, 232, .09);
+  font: 500 11.5px/19px var(--mono);
+  color: var(--text);
+  text-align: center;
+  vertical-align: 1px;
+}
+.kbd-hint { font-size: 12px; line-height: 1; color: var(--text-3); }
+
+.btn {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color .12s, color .12s;
+}
+.btn .kbd-hint { margin-left: 4px; }
+.btn-primary { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-primary:disabled { background: var(--fill); color: var(--text-3); }
+.btn-ghost { background: var(--fill); color: var(--text); }
+.btn-ghost:hover:not(:disabled) { background: var(--fill-hover); }
+.btn-ghost:disabled { color: var(--text-3); }
+.btn-plain { padding: 0 10px; color: var(--text-2); }
+.btn-plain:hover { background: var(--fill); color: var(--text); }
+
+.icon-btn {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--text-2);
+  transition: background-color .12s, color .12s;
+}
+.icon-btn:hover:not(:disabled) { background: var(--fill-hover); color: var(--text); }
+.icon-btn:disabled { opacity: .4; }
+
+/* Always-visible row menu: actions never depend on hover */
+.more { color: var(--text-3); }
+.more[aria-expanded="true"] { background: var(--fill-hover); color: var(--text); }
+.more-slot { display: block; width: 28px; height: 28px; }
+.more-wrap { position: relative; flex: none; }
+
+.link { border-radius: 3px; color: var(--text-2); text-decoration: none; }
+.link:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(241, 238, 232, .35); }
+
+.switch {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--off);
+  transition: background-color .15s;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .45);
+  transition: transform .15s var(--ease);
+}
+.switch[aria-checked="true"] { background: var(--accent); }
+.switch[aria-checked="true"]::after { transform: translateX(14px); }
+
+.radio {
+  position: relative;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px rgba(241, 238, 232, .32);
+  transition: box-shadow .12s;
+}
+.radio::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: scale(0);
+  transition: transform .15s var(--ease);
+}
+.radio.is-on { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.radio.is-on::after { transform: scale(1); }
+
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field-label { font-size: 12.5px; font-weight: 500; color: var(--text-2); }
+.field-label .opt { font-weight: 400; color: var(--text-3); }
+.input {
+  width: 100%;
+  height: 34px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--fill);
+  font-size: 13.5px;
+  color: var(--text);
+  outline: none;
+  transition: background-color .12s, box-shadow .12s;
+}
+textarea.input { height: auto; min-height: 96px; padding: 9px 11px; line-height: 1.55; resize: vertical; display: block; }
+.input::placeholder { color: var(--text-3); }
+.input:hover { background: rgba(241, 238, 232, .08); }
+.input:focus { background: rgba(241, 238, 232, .085); box-shadow: 0 0 0 1px rgba(241, 238, 232, .34); }
+.app .input:focus-visible, .app .search input:focus-visible { outline: none; }   /* the 1px ring above is the focus indicator */
+
+.spinner {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(241, 238, 232, .22);
+  border-top-color: var(--text);
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.dot-state { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); }
+.dot-state::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* Floating layer: the only raised surface */
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 100%;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 5px;
+  border-radius: 10px;
+  background: var(--raised);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, .5), 0 0 0 1px rgba(255, 255, 255, .07);
+}
+.menu.is-up { top: auto; bottom: calc(100% + 6px); }
+.menu-row { min-width: 196px; }
+.menu-item {
+  width: 100%;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px 0 9px;
+  border-radius: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--text);
+}
+.menu-item:hover:not(:disabled), .menu-item:focus { background: rgba(241, 238, 232, .08); outline: none; }
+.menu-item:disabled { color: var(--text-3); }
+.menu-item .check { color: var(--accent); visibility: hidden; }
+.menu-item[aria-checked="true"] .check { visibility: visible; }
+.menu-row .menu-item .i { color: var(--text-3); }
+.menu-item.is-danger, .menu-row .menu-item.is-danger .i { color: var(--accent); }
+.menu-foot { color: var(--text-2); }
+.menu-sep { height: 1px; margin: 5px 6px; background: rgba(255, 255, 255, .08); }
+
+.picker-wrap { position: relative; flex: none; }
+.picker {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 9px 0 11px;
+  border-radius: 7px;
+  background: var(--fill);
+  font-size: 13px;
+  transition: background-color .12s;
+}
+.picker:hover { background: var(--fill-hover); }
+.picker-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.picker > .i { color: var(--text-3); }
+
+/* ───────────── Hairline lists ───────────── */
+
+.list { margin: 0 -12px; }
+.item { position: relative; min-height: 40px; padding: 16px 12px; border-radius: 9px; transition: background-color .12s; }
+.item + .item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: var(--hair);
+  transition: opacity .12s;
+}
+.item.is-hoverable:hover { background: var(--hover); }
+.item.is-hoverable:hover::before,
+.item.is-hoverable:hover + .item::before { opacity: 0; }
+
+.confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: var(--text);
+}
+.confirm-text { margin-right: auto; }
+
+.empty { padding: 64px 0 24px; text-align: center; color: var(--text-2); }
+.empty-title { margin-bottom: 6px; font-size: 15px; font-weight: 500; color: var(--text); }
+
+/* ───────────── Home ───────────── */
+
+.search {
+  width: 220px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px 0 11px;
+  border-radius: 8px;
+  background: var(--fill);
+  color: var(--text-3);
+  cursor: text;
+  transition: background-color .12s, box-shadow .12s;
+}
+.search:hover { background: rgba(241, 238, 232, .08); }
+.search:focus-within { background: rgba(241, 238, 232, .085); box-shadow: 0 0 0 1px rgba(241, 238, 232, .34); }
+.search input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: none; outline: none; font-size: 13.5px; color: var(--text); }
+.search input::placeholder { color: var(--text-3); }
+.search .kbd-hint { padding-right: 5px; }
+.search-clear { display: none; width: 22px; height: 22px; place-items: center; border-radius: 5px; color: var(--text-2); }
+.search-clear:hover { background: var(--fill-hover); color: var(--text); }
+.search:has(input:not(:placeholder-shown)) .kbd-hint { display: none; }
+.search:has(input:not(:placeholder-shown)) .search-clear { display: grid; }
+
+.intro { margin: 0 0 36px; }
+.pipeline {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  color: var(--text-2);
+}
+.pipeline-label { color: var(--text-3); }
+.seg { border-radius: 3px; color: var(--text); text-decoration: none; }
+.seg:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(241, 238, 232, .35); }
+.seg.is-off { color: var(--text-3); }
+.arrow { color: var(--text-3); }
+
+.day { margin: 36px 0 6px; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.day:first-child { margin-top: 0; }
+
+.entry { display: flex; align-items: flex-start; gap: 20px; }
+.entry-main { flex: 1; min-width: 0; }
+.entry-text {
+  display: block;
+  width: 100%;
+  max-width: 64ch;
+  border-radius: 4px;
+  font-size: 14.5px;
+  line-height: 23px;
+  white-space: pre-line;
+  color: var(--text);
+}
+.entry-text > span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.entry.is-original .entry-text { color: var(--text-2); }
+.entry-text mark { background: rgba(242, 106, 75, .28); color: inherit; border-radius: 2px; }
+.entry-meta { margin-top: 6px; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-3); }
+.entry-side { flex: none; height: 23px; display: flex; align-items: center; gap: 4px; }
+.entry-side .more { margin-right: -6px; }
+.entry-time { min-width: 38px; text-align: right; font-size: 12.5px; color: var(--text-3); }
+.copied { min-width: 38px; text-align: right; font-size: 12.5px; color: var(--accent); }
+
+.toast-host {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 22px;
+  z-index: 35;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 10px;
+  background: var(--raised);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, .5), 0 0 0 1px rgba(255, 255, 255, .07);
+  pointer-events: auto;
+  animation: toast-in .18s var(--ease);
+}
+.toast.is-plain { padding: 9px 14px; }
+.toast b { font-weight: 600; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* ───────────── Styles ───────────── */
+
+.style-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: start; }
+.style-row .more-wrap { margin: -3px -6px 0 0; }
+.style-row .confirm { grid-column: 1 / -1; margin-left: 30px; }
+.pick { width: 100%; display: flex; align-items: flex-start; gap: 14px; border-radius: 6px; }
+.pick .radio { margin-top: 3px; }
+.pick-body { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.pick-name { font-size: 14.5px; font-weight: 500; line-height: 22px; color: var(--text); }
+.pick-desc {
+  max-width: 60ch;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.editor { display: flex; flex-direction: column; gap: 16px; padding: 18px 12px 20px 42px; }
+.editor-foot { display: flex; align-items: center; gap: 6px; }
+.editor-foot .kbd-hint { margin-right: auto; }
+
+/* ───────────── Providers ───────────── */
+
+.prov-row { display: flex; align-items: center; gap: 14px; }
+.prov-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.prov-main .disclosure { margin-left: -6px; }
+.prov-text { min-width: 0; }
+.prov-name { font-size: 14.5px; font-weight: 500; line-height: 22px; }
+.prov-meta { margin-top: 1px; font-size: 12.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prov .picker { width: 184px; }
+.disclosure { width: 24px; height: 24px; color: var(--text-3); }
+.disclosure .i { transition: transform .15s var(--ease); }
+.disclosure[aria-expanded="true"] .i { transform: rotate(90deg); }
+.conn { padding: 20px 0 6px 28px; }
+.conn-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.conn-fields.is-one { grid-template-columns: minmax(0, 360px); }
+.conn-foot { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+.conn-status { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-3); }
+.conn-foot .btn-plain { margin-left: auto; margin-right: -10px; }
+
+/* ───────────── Speech models ───────────── */
+
+.switch-label { font-size: 13px; color: var(--text-2); cursor: pointer; }
+.off-note { margin: 0 0 22px; color: var(--text); }
+.engines { margin: 0 -12px; container-type: inline-size; transition: opacity .15s; }
+.engines.is-off { opacity: .4; pointer-events: none; }
+.engine { position: relative; padding: 6px 0; }
+.engine + .engine { margin-top: 8px; }
+.engine + .engine::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: var(--hair);
+}
+.engine-head {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border-radius: 8px;
+  transition: background-color .12s;
+}
+.engine-head:hover { background: var(--hover); }
+.engine-chev { flex: none; width: 16px; display: grid; place-items: center; color: var(--text-3); }
+.engine-chev .i { transition: transform .15s var(--ease); }
+.engine-head[aria-expanded="true"] .engine-chev .i { transform: rotate(90deg); }
+.engine-name { flex: none; font-size: 14.5px; font-weight: 600; }
+.engine-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--text-3); }
+.engine-side { flex: none; margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: var(--text-3); }
+
+.mrow {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px 76px minmax(0, 1fr) 62px 96px 28px;
+  column-gap: 12px;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color .12s;
+}
+.mrow:hover { background: var(--hover); }
+.radio-btn { width: 16px; height: 16px; display: grid; place-items: center; border-radius: 50%; }
+.m-name { font-size: 13.5px; font-weight: 500; white-space: nowrap; }
+.m-desc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.m-size { text-align: right; font-size: 12.5px; color: var(--text-2); white-space: nowrap; }
+.m-status { display: flex; justify-content: flex-end; font-size: 12.5px; color: var(--text-3); white-space: nowrap; }
+.m-act { display: flex; justify-content: flex-end; }
+.get {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: -6px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  transition: background-color .12s, color .12s;
+}
+.get:hover:not(:disabled) { background: var(--fill-hover); color: var(--text); }
+.get:disabled { opacity: .45; }
+.m-track {
+  position: absolute;
+  left: 40px;
+  right: 12px;
+  bottom: 3px;
+  height: 2px;
+  border-radius: 1px;
+  overflow: hidden;
+  background: rgba(241, 238, 232, .08);
+}
+.m-track > span { display: block; height: 100%; background: var(--accent); transition: width .1s linear; }
+.m-extra { grid-column: 2 / -1; display: flex; align-items: center; gap: 8px; padding: 2px 0 12px; cursor: default; }
+.m-extra-text { margin-right: auto; color: var(--text-2); }
+.m-extra-text b { font-weight: 500; color: var(--text); }
+
+@container (max-width: 470px) {
+  .mrow { grid-template-columns: 16px minmax(0, 1fr) 62px 96px 28px; }
+  .m-desc { display: none; }
+}
+
+/* ───────────── Settings + Help ───────────── */
+
+.group + .group { margin-top: 40px; }
+.group-title { margin: 0 0 4px; font-size: 13.5px; font-weight: 600; color: var(--text); }
+.setting { position: relative; display: flex; align-items: center; gap: 24px; padding: 16px 0; }
+.setting + .setting::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--hair); }
+.setting-text { flex: 1; min-width: 0; }
+.setting-label { font-size: 14.5px; line-height: 22px; }
+.setting-desc { margin-top: 2px; color: var(--text-2); }
+.setting-desc.is-warn { color: var(--text); }
+.setting-control { flex: none; display: flex; align-items: center; gap: 6px; }
+.lang .picker { width: 168px; }
+
+.step { align-items: flex-start; gap: 16px; }
+.step-num { width: 14px; flex: none; font-size: 12.5px; line-height: 22px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.step .link { flex: none; font-size: 12.5px; line-height: 22px; }
+.keys { flex: none; display: flex; gap: 4px; align-items: center; }
+.keys .kbd-note { margin-right: 4px; font-size: 12.5px; color: var(--text-3); }
+.about { margin: 10px 0 0; max-width: 60ch; color: var(--text-2); }
+.version { margin: 8px 0 0; font-size: 12.5px; color: var(--text-3); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="window" id="window">
+    <div class="app">
+      <nav class="side" id="rail" aria-label="Sections"></nav>
+      <div class="content">
+        <section class="page" id="page"></section>
+        <div class="toast-host" id="toast"></div>
+      </div>
+    </div>
+  </div>
+</main>
+<div id="live" class="sr-only" aria-live="polite"></div>
+
+<script>
+"use strict";
+
+// ───────────── Data ─────────────
+
+// Speech-to-text engines. Parakeet sizes are placeholders until we pick the Core ML builds.
+const ENGINES = [
+  { id: "whisper", name: "Whisper", meta: "OpenAI · 99 languages", models: [
+    { id: "w-tiny", name: "Tiny", bytes: 75e6, desc: "Fastest, lower accuracy" },
+    { id: "w-base", name: "Base", bytes: 142e6, desc: "Fast, lightweight", bundled: true },
+    { id: "w-small", name: "Small", bytes: 466e6, desc: "Good accuracy, faster" },
+    { id: "w-medium", name: "Medium", bytes: 1530e6, desc: "Balanced accuracy & speed" },
+    { id: "w-large-v3", name: "Large v3", bytes: 3090e6, desc: "Highest accuracy" },
+  ] },
+  { id: "parakeet", name: "Parakeet", meta: "NVIDIA · English and European languages", models: [
+    { id: "p-v2", name: "v2", bytes: 600e6, desc: "English only, very fast" },
+    { id: "p-v3", name: "v3", bytes: 640e6, desc: "25 European languages, very fast" },
+  ] },
+];
+const MODELS = ENGINES.flatMap(e => e.models.map(m => ({ ...m, engine: e })));
+const FALLBACK_MODEL = "w-base";
+
+const LLM_MODELS = {
+  openai: ["gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4.1", "gpt-4.1-mini", "gpt-4o-mini"],
+  local: ["gemma-2-9b-it", "llama-3.1-8b-instruct", "mistral-7b-instruct-v0.3", "qwen2.5-7b-instruct"],
+};
+
+const LANGS = [
+  ["auto", "Auto-detect"], ["en", "English"], ["it", "Italian"], ["es", "Spanish"],
+  ["fr", "French"], ["de", "German"], ["pt", "Portuguese"], ["ja", "Japanese"],
+];
+
+const NAV = {
+  groups: [
+    [["home", "Home", "house"], ["styles", "Styles", "brush"]],
+    [["speech", "Speech models", "wave"], ["providers", "Providers", "plug"]],
+  ],
+  bottom: [["settings", "Settings", "settings"], ["help", "Help", "help"]],
+};
+const ALL_NAV = [...NAV.groups.flat(), ...NAV.bottom];
+
+const ENTRIES = [
+  { id: "e1", day: "Today", time: "10:42", style: "Email",
+    text: "Hi Marco,\nThanks for sending the draft over. I left a few comments on the pricing section — happy to jump on a call tomorrow morning if that's easier.",
+    raw: "hey marco thanks for sending the draft over I went through it and left a few comments on the pricing part happy to jump on a call tomorrow morning if that's easier" },
+  { id: "e2", day: "Today", time: "10:15",
+    text: "Remind me to move the standup to 9:30 on Thursday and add the design review to the agenda." },
+  { id: "e3", day: "Today", time: "09:03", style: "Bullet points",
+    text: "• Fix the crash when the microphone permission is revoked\n• Bump Whisper to the latest release\n• Write the release notes for 1.1",
+    raw: "okay so for today fix the crash when the microphone permission is revoked bump whisper to the latest release and write the release notes for one point one" },
+  { id: "e4", day: "Yesterday", time: "18:47",
+    text: "The onboarding feels too long. We could skip the model download step and use the bundled Base model until someone picks another one." },
+  { id: "e5", day: "Yesterday", time: "16:20", style: "Email",
+    text: "Hi team,\nQuick update: the beta build is ready for testing. Please install it from the usual link and report anything odd in #shh-beta by Friday.",
+    raw: "hi team quick update the beta build is ready for testing please install it from the usual link and report anything weird in the shh beta channel by friday" },
+  { id: "e6", day: "Yesterday", time: "11:02",
+    text: "Grocery list: oat milk, coffee beans, lemons, and something for dinner on Saturday." },
+  { id: "e7", day: "Sun, Oct 19", time: "21:34", style: "Bullet points",
+    text: "• Compare Whisper Small and Medium on the noisy dataset\n• Check the word error rate on accented speech",
+    raw: "compare whisper small and medium on the noisy dataset and check the word error rate on accented speech" },
+  { id: "e8", day: "Sun, Oct 19", time: "15:12",
+    text: "Idea for the blog post: why on-device transcription matters for privacy, and what it costs in battery and speed." },
+];
+
+const STYLES = [
+  { id: "email", name: "Email",
+    prompt: "Rewrite the transcript as a clear, friendly email. Fix grammar and punctuation, add a greeting and paragraph breaks, and keep the original meaning and tone." },
+  { id: "bullets", name: "Bullet points",
+    prompt: "Turn the transcript into a concise bulleted list. One idea per bullet, no introduction or closing sentence." },
+  { id: "slack", name: "Slack message",
+    prompt: "Rewrite as a short, casual Slack message. Keep it to two or three sentences and drop filler words." },
+  { id: "code", name: "Code comment",
+    prompt: "Rewrite as a concise code comment in plain English. Explain what the code does and why, not how. Don't add comment markers." },
+];
+
+const S = {
+  page: pageFromHash(),
+  focusKey: null,
+  menu: null,                 // "model:<providerId>" | "lang"
+  search: "",
+  entries: ENTRIES.map(e => ({ ...e })),
+  showRaw: {},
+  copiedId: null,
+  undo: null,                 // { entry, index }
+  styles: STYLES.map(s => ({ ...s })),
+  activeStyle: "email",
+  styleEdit: null,            // { id: "new" | styleId, name, prompt }
+  styleConfirm: null,
+  providers: [
+    { id: "openai", name: "OpenAI", kind: "cloud", apiKey: "sk-proj-demo-7c1e3f2a", endpoint: "",
+      model: "gpt-5-mini", models: [...LLM_MODELS.openai], status: null },
+    { id: "local", name: "Local", kind: "local", apiKey: "", endpoint: "http://localhost:1234/v1",
+      model: "qwen2.5-7b-instruct", models: [...LLM_MODELS.local], status: null },
+  ],
+  activeProvider: "openai",
+  expanded: null,
+  speech: {
+    enabled: true,
+    inUse: "w-small",
+    selected: "w-small",
+    downloaded: { "w-base": true, "w-small": true },
+    download: null,           // { id, progress, use }
+    open: { whisper: true, parakeet: false },
+    confirmDelete: null,
+  },
+  notice: null,               // plain toast text
+  settings: { language: "auto", launchAtLogin: true, clearConfirm: false },
+};
+
+let dlTimer = null;
+let toastTimer = null;
+let copyTimer = null;
+
+// ───────────── Helpers ─────────────
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const el = { rail: $("#rail"), page: $("#page"), toast: $("#toast"), live: $("#live") };
+
+function pageFromHash() {
+  const id = location.hash.slice(1);
+  if (id === "whisper") return "speech";   // old deep link
+  return ALL_NAV.some(([k]) => k === id) ? id : "home";
+}
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const fmtBytes = b => (b >= 1e9 ? `${(b / 1e9).toFixed(2)} GB` : `${Math.round(b / 1e6)} MB`);
+const model = id => MODELS.find(m => m.id === id);
+const fullName = id => `${model(id).engine.name} ${model(id).name}`;
+const provider = id => S.providers.find(p => p.id === id);
+const activeStyle = () => S.styles.find(s => s.id === S.activeStyle) || null;
+const activeProvider = () => provider(S.activeProvider) || null;
+const host = url => url.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function announce(msg) {
+  el.live.textContent = "";
+  requestAnimationFrame(() => { el.live.textContent = msg; });
+}
+
+// Lucide paths, standing in for SF Symbols.
+const ICONS = {
+  house: '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  brush: '<path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>',
+  plug: '<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>',
+  wave: '<path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/>',
+  settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+  pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  chevron: '<path d="m6 9 6 6 6-6"/>',
+  right: '<path d="m9 18 6-6-6-6"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  download: '<path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  swap: '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
+  use: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>',
+  stop: '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+};
+
+function icon(name, size = 16, stroke = 2) {
+  return `<svg class="i" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONS[name]}</svg>`;
+}
+
+function switchHTML(key, on, label, attrs = "") {
+  return `<button class="switch" role="switch" aria-checked="${on}" aria-label="${esc(label)}" data-key="${key}" ${attrs}></button>`;
+}
+
+// Always-visible "…" for a row. The same menu opens on right-click (SwiftUI: .contextMenu).
+// menuId is "row:<kind>:<id>"; items are { label, icon, action, id, key, danger?, disabled? } or "-".
+function moreMenu(menuId, label, items) {
+  if (!items.length) return '<span class="more-slot" aria-hidden="true"></span>';
+  const open = S.menu === menuId;
+  return `
+    <div class="picker-wrap more-wrap">
+      <button class="icon-btn more" data-action="menu" data-menu="${menuId}" data-key="more-${menuId.split(":")[2]}"
+        aria-haspopup="menu" aria-expanded="${open}" aria-label="Actions for ${esc(label)}" title="More">${icon("more", 16, 2.25)}</button>
+      ${open ? `
+      <div class="menu menu-row" role="menu" aria-label="${esc(label)}">
+        ${items.map(it => it === "-" ? '<div class="menu-sep" role="separator"></div>' : `
+          <button class="menu-item${it.danger ? " is-danger" : ""}" role="menuitem" tabindex="-1" data-action="${it.action}" data-id="${it.id ?? ""}" data-key="${it.key}"${it.disabled ? " disabled" : ""}>${icon(it.icon, 14)}<span>${it.label}</span></button>`).join("")}
+      </div>` : ""}
+    </div>`;
+}
+
+// ───────────── Render ─────────────
+
+function render() {
+  const focusKey = S.focusKey ?? document.activeElement?.dataset?.key;
+  S.focusKey = null;
+  renderRail();
+  renderPage();
+  renderToast();
+  if (focusKey) $(`[data-key="${CSS.escape(focusKey)}"]`)?.focus({ preventScroll: true });
+  placeMenus();
+}
+
+function renderRail() {
+  const row = ([id, label, ic]) => `
+    <a class="nav-row" href="#${id}" data-key="nav-${id}"${S.page === id ? ' aria-current="page"' : ""}>
+      ${icon(ic, 16, 1.75)}<span>${label}</span>
+    </a>`;
+  el.rail.innerHTML = `
+    <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+    <a class="brand" href="#home" data-key="brand">Shh..</a>
+    <div class="nav nav-top">${NAV.groups.map(g => g.map(row).join("")).join('<div class="nav-gap" aria-hidden="true"></div>')}</div>
+    <div class="nav nav-bottom">${NAV.bottom.map(row).join("")}</div>
+    ${statusHTML()}`;
+}
+
+// Live status for a menu-bar app: is fn armed, and with which model.
+function statusHTML() {
+  const sp = S.speech;
+  const on = sp.enabled;
+  return `
+    <a class="side-status${on ? "" : " is-off"}" href="#speech" data-key="side-status"
+      aria-label="${on ? `Ready. Hold fn to dictate with ${fullName(sp.inUse)}` : "Transcription is off"}">
+      <span class="status-line" aria-hidden="true"><span class="status-dot"></span>${on ? `Ready <span class="status-hint">· hold <kbd>fn</kbd></span>` : "Transcription off"}</span>
+      <span class="status-model" aria-hidden="true">${on ? fullName(sp.inUse) : "fn is paused"}</span>
+    </a>`;
+}
+
+const PAGES = {
+  home: { title: "Home", sub: "Hold fn to dictate. Release, and it's on your clipboard.", actions: homeActions, body: homeBody },
+  styles: { title: "Styles", sub: "A style rewrites what you said before it's copied. Pick one, or none.", actions: stylesActions, body: stylesBody },
+  providers: { title: "Providers", sub: "When a style is on, the active provider does the rewriting. One at a time.", body: providersBody },
+  speech: { title: "Speech models", sub: "Speech becomes text on this Mac and is never uploaded. Larger models are more accurate, but slower.", actions: speechActions, body: speechBody },
+  settings: { title: "Settings", sub: "How Shh.. starts, listens and what it keeps.", body: settingsBody },
+  help: { title: "Help", sub: "The basics and every shortcut.", body: helpBody },
+};
+
+function renderPage() {
+  const p = PAGES[S.page];
+  const scroller = $("#scroll");
+  const top = scroller && el.page.dataset.page === S.page ? scroller.scrollTop : 0;
+  el.page.dataset.page = S.page;
+  el.page.innerHTML = `
+    <header class="head">
+      <h1>${p.title}</h1>
+      ${p.actions ? `<div class="head-actions">${p.actions()}</div>` : ""}
+      <p class="sub">${p.sub}</p>
+    </header>
+    <div class="scroll" id="scroll"><div class="inner">${p.body()}</div></div>`;
+  $("#scroll").scrollTop = top;
+}
+
+function renderToast() {
+  if (S.undo) {
+    el.toast.innerHTML = `
+      <div class="toast" role="status">
+        <span>Dictation deleted</span>
+        <button class="btn btn-plain" data-action="undo" data-key="undo">Undo</button>
+      </div>`;
+  } else {
+    el.toast.innerHTML = S.notice ? `<div class="toast is-plain" role="status"><span>${S.notice}</span></div>` : "";
+  }
+}
+
+function showNotice(html) {
+  S.undo = null;
+  S.notice = html;
+  renderToast();
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { S.notice = null; renderToast(); }, 3500);
+}
+
+// ───────────── Home ─────────────
+
+function homeActions() {
+  return `
+    <label class="search">
+      ${icon("search", 14)}
+      <input id="search" data-key="search" placeholder="Search" value="${esc(S.search)}" autocomplete="off" spellcheck="false" aria-label="Search dictations">
+      <span class="kbd-hint" aria-hidden="true">⌘F</span>
+      <button class="search-clear" data-action="clear-search" data-key="clear-search" aria-label="Clear search">${icon("x", 12, 2.25)}</button>
+    </label>`;
+}
+
+function homeBody() {
+  return `
+    <div class="intro">
+      <p class="pipeline" aria-label="What happens to a dictation">${pipeline()}</p>
+    </div>
+    <div id="history">${historyHTML()}</div>`;
+}
+
+function pipeline() {
+  const sp = S.speech;
+  const st = activeStyle();
+  const pr = activeProvider();
+  const seg = (page, html, off) => `<a class="seg${off ? " is-off" : ""}" href="#${page}" data-key="seg-${page}">${html}</a>`;
+  const parts = [sp.enabled ? seg("speech", fullName(sp.inUse)) : seg("speech", "Transcription off", true)];
+  if (st) {
+    parts.push(seg("styles", `${esc(st.name)} style`));
+    parts.push(pr ? seg("providers", `${pr.name} · <span class="mono">${esc(pr.model)}</span>`) : seg("providers", "No provider", true));
+  } else {
+    parts.push(seg("styles", "No style", true));
+  }
+  parts.push("<span>Clipboard</span>");
+  return parts.join('<span class="arrow" aria-hidden="true">→</span>');
+}
+
+function matches(e, q) {
+  return e.text.toLowerCase().includes(q) || (e.raw || "").toLowerCase().includes(q);
+}
+
+function highlight(text) {
+  const q = S.search.trim().toLowerCase();
+  if (!q) return esc(text);
+  let out = "", at = 0;
+  const lower = text.toLowerCase();
+  for (let i = lower.indexOf(q); i !== -1; i = lower.indexOf(q, at)) {
+    out += esc(text.slice(at, i)) + `<mark>${esc(text.slice(i, i + q.length))}</mark>`;
+    at = i + q.length;
+  }
+  return out + esc(text.slice(at));
+}
+
+function historyHTML() {
+  const q = S.search.trim().toLowerCase();
+  if (!S.entries.length) {
+    return `
+      <div class="empty">
+        <div class="empty-title">No dictations yet</div>
+        <div>Hold fn anywhere on your Mac. What you say shows up here.</div>
+      </div>`;
+  }
+  const list = S.entries.filter(e => !q || matches(e, q));
+  if (!list.length) {
+    return `
+      <div class="empty">
+        <div class="empty-title">Nothing matches “${esc(S.search.trim())}”</div>
+        <button class="link" data-action="clear-search" data-key="clear-search-empty">Clear search</button>
+      </div>`;
+  }
+  const days = [];
+  list.forEach(e => {
+    const last = days[days.length - 1];
+    if (last && last.day === e.day) last.items.push(e);
+    else days.push({ day: e.day, items: [e] });
+  });
+  return days.map(d => `
+    <h2 class="day">${d.day}</h2>
+    <div class="list">${d.items.map(entryHTML).join("")}</div>`).join("");
+}
+
+function entryHTML(e) {
+  const showRaw = !!(e.raw && S.showRaw[e.id]);
+  const copied = S.copiedId === e.id;
+  const meta = e.style ? `
+    <div class="entry-meta">
+      <span>${showRaw ? "Original transcript" : `Rewritten with ${esc(e.style)}`}</span>
+      <span aria-hidden="true">·</span>
+      <button class="link" data-action="toggle-raw" data-id="${e.id}" data-key="raw-${e.id}">${showRaw ? `Show ${esc(e.style)} version` : "Show original"}</button>
+    </div>` : "";
+  const menuId = `row:entry:${e.id}`;
+  const items = [{ label: "Copy", icon: "copy", action: "copy", id: e.id, key: `copy-${e.id}` }];
+  if (e.raw) items.push({ label: showRaw ? `Show ${esc(e.style)} version` : "Show original", icon: "swap", action: "toggle-raw", id: e.id, key: `menu-raw-${e.id}` });
+  items.push("-", { label: "Delete", icon: "trash", action: "delete-entry", id: e.id, key: `del-${e.id}`, danger: true });
+  return `
+    <div class="item is-hoverable entry${showRaw ? " is-original" : ""}${copied ? " is-copied" : ""}" data-row-menu="${menuId}">
+      <div class="entry-main">
+        <button class="entry-text" data-action="copy" data-id="${e.id}" data-key="text-${e.id}" title="Click to copy"><span>${highlight(showRaw ? e.raw : e.text)}</span></button>
+        ${meta}
+      </div>
+      <div class="entry-side">
+        ${copied ? '<span class="copied" role="status">Copied</span>' : `<span class="entry-time num">${e.time}</span>`}
+        ${moreMenu(menuId, `dictation from ${e.time}`, items)}
+      </div>
+    </div>`;
+}
+
+function refreshHistory() {
+  const box = $("#history");
+  if (!box) return;
+  const key = document.activeElement?.dataset?.key;
+  box.innerHTML = historyHTML();
+  if (key && box.querySelector(`[data-key="${CSS.escape(key)}"]`)) box.querySelector(`[data-key="${CSS.escape(key)}"]`).focus({ preventScroll: true });
+}
+
+// ───────────── Styles ─────────────
+
+function stylesActions() {
+  return `<button class="btn btn-ghost" data-action="new-style" data-key="new-style"${S.styleEdit ? " disabled" : ""}>${icon("plus", 14)}New style<span class="kbd-hint" aria-hidden="true">⌘N</span></button>`;
+}
+
+function stylesBody() {
+  const none = S.activeStyle === null;
+  return `
+    <div class="list" role="radiogroup" aria-label="Active style">
+      ${S.styleEdit?.id === "new" ? editorHTML() : ""}
+      ${S.styles.map(styleRow).join("")}
+      <div class="item is-hoverable style-row">
+        <button class="pick" role="radio" aria-checked="${none}" tabindex="${none ? 0 : -1}" data-action="pick-style" data-id="" data-key="style-none">
+          <span class="radio${none ? " is-on" : ""}" aria-hidden="true"></span>
+          <span class="pick-body"><span class="pick-name">No style</span><span class="pick-desc">Copy the transcript exactly as it was heard.</span></span>
+        </button>
+        <span class="more-slot" aria-hidden="true"></span>
+      </div>
+    </div>`;
+}
+
+function styleRow(s) {
+  if (S.styleEdit?.id === s.id) return editorHTML();
+  const on = S.activeStyle === s.id;
+  const confirming = S.styleConfirm === s.id;
+  const menuId = `row:style:${s.id}`;
+  const items = [
+    on ? { label: "Stop using", icon: "stop", action: "pick-style", id: "", key: `menu-stop-${s.id}` }
+       : { label: "Use", icon: "use", action: "pick-style", id: s.id, key: `menu-use-${s.id}` },
+    { label: "Edit", icon: "pencil", action: "edit-style", id: s.id, key: `edit-${s.id}` },
+    "-",
+    { label: "Delete…", icon: "trash", action: "ask-delete-style", id: s.id, key: `ask-del-${s.id}`, danger: true },
+  ];
+  return `
+    <div class="item is-hoverable style-row"${confirming ? "" : ` data-row-menu="${menuId}"`}>
+      <button class="pick" role="radio" aria-checked="${on}" tabindex="${on ? 0 : -1}" data-action="pick-style" data-id="${s.id}" data-key="style-${s.id}">
+        <span class="radio${on ? " is-on" : ""}" aria-hidden="true"></span>
+        <span class="pick-body"><span class="pick-name">${esc(s.name)}</span><span class="pick-desc">${esc(s.prompt)}</span></span>
+      </button>
+      ${confirming ? '<span class="more-slot" aria-hidden="true"></span>' : moreMenu(menuId, s.name, items)}
+      ${confirming ? `
+      <div class="confirm" role="group" aria-label="Confirm delete">
+        <span class="confirm-text">Delete “${esc(s.name)}”? This can't be undone.</span>
+        <button class="btn btn-plain" data-action="cancel-delete-style" data-key="cancel-del">Cancel</button>
+        <button class="btn btn-primary" data-action="delete-style" data-id="${s.id}" data-key="confirm-del">Delete</button>
+      </div>` : ""}
+    </div>`;
+}
+
+function editorHTML() {
+  const d = S.styleEdit;
+  const isNew = d.id === "new";
+  return `
+    <div class="item editor" role="group" aria-label="${isNew ? "New style" : `Edit ${esc(d.name)}`}">
+      <label class="field">
+        <span class="field-label">Name</span>
+        <input class="input" data-draft="name" data-key="draft-name" value="${esc(d.name)}" placeholder="Meeting notes" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="field-label">Instructions</span>
+        <textarea class="input" rows="4" data-draft="prompt" data-key="draft-prompt" placeholder="Tell the model how to rewrite your transcript.">${esc(d.prompt)}</textarea>
+      </label>
+      <div class="editor-foot">
+        <span class="kbd-hint">⌘↩ save · esc cancel</span>
+        <button class="btn btn-plain" data-action="cancel-edit" data-key="cancel-edit">Cancel</button>
+        <button class="btn btn-primary" data-action="save-style" data-key="save-style"${d.name.trim() ? "" : " disabled"}>${isNew ? "Create style" : "Save"}</button>
+      </div>
+    </div>`;
+}
+
+function saveStyle() {
+  const d = S.styleEdit;
+  if (!d || !d.name.trim()) return;
+  if (d.id === "new") {
+    const id = `s${Date.now()}`;
+    S.styles.unshift({ id, name: d.name.trim(), prompt: d.prompt.trim() });
+    S.focusKey = `style-${id}`;
+    announce(`Created ${d.name.trim()}`);
+  } else {
+    Object.assign(S.styles.find(s => s.id === d.id), { name: d.name.trim(), prompt: d.prompt.trim() });
+    S.focusKey = `style-${d.id}`;
+  }
+  S.styleEdit = null;
+  render();
+}
+
+// ───────────── Providers ─────────────
+
+function providersBody() {
+  return `
+    <div class="list">${S.providers.map(providerRow).join("")}</div>`;
+}
+
+function providerRow(p) {
+  const on = S.activeProvider === p.id;
+  const open = S.expanded === p.id;
+  return `
+    <div class="item prov">
+      <div class="prov-row">
+        <div class="prov-main" data-action="expand" data-id="${p.id}">
+          <button class="icon-btn disclosure" data-action="expand" data-id="${p.id}" data-key="exp-${p.id}"
+            aria-expanded="${open}" aria-controls="conn-${p.id}" aria-label="${p.name} connection settings">${icon("right", 14)}</button>
+          <div class="prov-text">
+            <div class="prov-name">${p.name}</div>
+            <div class="prov-meta">${providerMeta(p)}</div>
+          </div>
+        </div>
+        ${modelPicker(p)}
+        ${switchHTML(`switch-${p.id}`, on, `Use ${p.name}`, `data-action="provider-toggle" data-id="${p.id}"`)}
+      </div>
+      ${open ? connHTML(p) : ""}
+    </div>`;
+}
+
+function providerMeta(p) {
+  if (p.kind === "cloud") {
+    return p.apiKey.trim()
+      ? `Cloud · key ••••${esc(p.apiKey.slice(-4))}`
+      : "Cloud · needs an API key";
+  }
+  return p.endpoint.trim() ? `Local · <span class="mono">${esc(host(p.endpoint))}</span>` : "Local · needs an endpoint";
+}
+
+function modelPicker(p) {
+  const open = S.menu === `model:${p.id}`;
+  return `
+    <div class="picker-wrap">
+      <button class="picker mono" data-action="menu" data-menu="model:${p.id}" data-key="picker-${p.id}"
+        aria-haspopup="menu" aria-expanded="${open}" aria-label="${p.name} model: ${esc(p.model)}" title="${esc(p.model)}">
+        <span class="picker-label">${esc(p.model)}</span>${icon("chevron", 12)}
+      </button>
+      ${open ? `
+      <div class="menu" role="menu" aria-label="${p.name} models">
+        ${p.models.map((m, i) => `
+          <button class="menu-item mono" role="menuitemradio" aria-checked="${m === p.model}" tabindex="-1"
+            data-action="pick-llm" data-id="${p.id}" data-value="${esc(m)}" data-key="opt-${p.id}-${i}">${icon("check", 13, 2.5).replace('class="i"', 'class="i check"')}<span>${esc(m)}</span></button>`).join("")}
+        <div class="menu-sep" role="separator"></div>
+        <button class="menu-item menu-foot" role="menuitem" tabindex="-1" data-action="fetch" data-id="${p.id}" data-key="opt-${p.id}-refresh">${icon("refresh", 13)}<span>Refresh models</span></button>
+      </div>` : ""}
+    </div>`;
+}
+
+function connHTML(p) {
+  const cloud = p.kind === "cloud";
+  const status = p.status === "loading"
+    ? '<span class="spinner" aria-hidden="true"></span>Fetching models…'
+    : p.status ? esc(p.status) : "";
+  return `
+    <div class="conn" id="conn-${p.id}">
+      <div class="conn-fields${cloud ? "" : " is-one"}">
+        ${cloud ? `
+        <label class="field">
+          <span class="field-label">API key</span>
+          <input class="input mono" type="password" value="${esc(p.apiKey)}" placeholder="sk-…" autocomplete="off" spellcheck="false" data-field="apiKey" data-id="${p.id}" data-key="in-${p.id}-apiKey">
+        </label>` : ""}
+        <label class="field">
+          <span class="field-label">Endpoint URL${cloud ? ' <span class="opt">optional</span>' : ""}</span>
+          <input class="input mono" type="url" value="${esc(p.endpoint)}" placeholder="${cloud ? "https://api.openai.com/v1" : "http://localhost:1234/v1"}" autocomplete="off" spellcheck="false" data-field="endpoint" data-id="${p.id}" data-key="in-${p.id}-endpoint">
+        </label>
+      </div>
+      <div class="conn-foot">
+        <button class="btn btn-ghost" data-action="fetch" data-id="${p.id}" data-key="fetch-${p.id}"${p.status === "loading" ? " disabled" : ""}>${icon("refresh", 13)}Fetch models</button>
+        <span class="conn-status" aria-live="polite">${status}</span>
+        <button class="btn btn-plain" data-action="expand" data-id="${p.id}" data-key="done-${p.id}">Done</button>
+      </div>
+    </div>`;
+}
+
+function fetchModels(id) {
+  const p = provider(id);
+  S.menu = null;
+  p.status = "loading";
+  render();
+  setTimeout(() => {
+    p.models = [...LLM_MODELS[id]];
+    if (!p.models.includes(p.model)) p.model = p.models[0];
+    p.status = `${p.models.length} models available`;
+    announce(`${p.name}: ${p.status}`);
+    render();
+  }, 800);
+}
+
+// ───────────── Speech models ─────────────
+
+function speechActions() {
+  return `
+    <span class="switch-label" data-action="speech-toggle">On-device transcription</span>
+    ${switchHTML("speech-switch", S.speech.enabled, "On-device transcription", 'data-action="speech-toggle"')}`;
+}
+
+function speechBody() {
+  const sp = S.speech;
+  // Keep the radio group reachable with Tab even when the selected model sits in a collapsed engine.
+  const visible = MODELS.filter(m => sp.open[m.engine.id]);
+  const tabStop = (visible.find(m => m.id === sp.selected) || visible[0])?.id;
+  return `
+    ${sp.enabled ? "" : `<p class="off-note">Transcription is off. Holding fn won't record until you turn it back on.</p>`}
+    <div class="engines${sp.enabled ? "" : " is-off"}" role="radiogroup" aria-label="Speech model">
+      ${ENGINES.map(e => engineHTML(e, tabStop)).join("")}
+    </div>`;
+}
+
+function engineHTML(e, tabStop) {
+  const sp = S.speech;
+  const open = sp.open[e.id];
+  const onDisk = e.models.filter(m => sp.downloaded[m.id]).reduce((sum, m) => sum + m.bytes, 0);
+  const inUse = e.models.find(m => m.id === sp.inUse);
+  return `
+    <section class="engine">
+      <button class="engine-head" data-action="toggle-engine" data-id="${e.id}" data-key="engine-${e.id}"
+        aria-expanded="${open}" aria-controls="models-${e.id}">
+        <span class="engine-chev">${icon("right", 14, 2.25)}</span>
+        <span class="engine-name">${e.name}</span>
+        <span class="engine-meta" title="${esc(e.meta)}">${e.meta}</span>
+        <span class="engine-side">
+          ${inUse && !open ? `<span class="dot-state">${inUse.name} in use</span>` : ""}
+          <span>${onDisk ? `<span class="mono num">${fmtBytes(onDisk)}</span> on disk` : "Not downloaded"}</span>
+        </span>
+      </button>
+      ${open ? `<div id="models-${e.id}">${e.models.map(m => modelRow(m, tabStop)).join("")}</div>` : ""}
+    </section>`;
+}
+
+function modelRow(m, tabStop) {
+  const sp = S.speech;
+  const sel = sp.selected === m.id;
+  const ready = !!sp.downloaded[m.id];
+  const d = sp.download && sp.download.id === m.id ? sp.download : null;
+  const pct = d ? Math.round(d.progress * 100) : 0;
+
+  const offering = sel && !ready && !d;
+  const busy = !!sp.download;
+
+  let status = "";
+  let statusText = "not downloaded";
+  if (d) { status = `<span class="num" id="dl-pct">${pct}%</span>`; statusText = "downloading"; }
+  else if (sp.inUse === m.id) { status = '<span class="dot-state">In use</span>'; statusText = "in use"; }
+  else if (ready) { status = m.bundled ? "Built in" : "On disk"; statusText = m.bundled ? "built in" : "on disk"; }
+  else if (!offering) {   // the offer below already has a Download button
+    status = `<button class="get" data-action="dl" data-id="${m.id}" data-key="dl-${m.id}"${busy ? " disabled" : ""}
+      aria-label="Download ${fullName(m.id)}, ${fmtBytes(m.bytes)}" title="${busy ? "One download at a time" : `Download ${fmtBytes(m.bytes)}`}">${icon("download", 13)}Download</button>`;
+  }
+
+  let act = "";
+  if (d) {
+    act = `<button class="icon-btn" data-action="dl-cancel" data-key="dl-cancel" aria-label="Cancel download" title="Cancel download">${icon("x", 14)}</button>`;
+  } else {
+    const menuId = `row:model:${m.id}`;
+    const items = [];
+    if (!ready) {
+      items.push(
+        { label: "Download and use", icon: "download", action: "dl-use", id: m.id, key: `menu-dluse-${m.id}`, disabled: busy },
+        { label: `Download only · ${fmtBytes(m.bytes)}`, icon: "download", action: "dl", id: m.id, key: `menu-dl-${m.id}`, disabled: busy });
+    } else {
+      if (sp.inUse !== m.id) items.push({ label: "Use", icon: "use", action: "pick-model", id: m.id, key: `menu-use-${m.id}` });
+      if (!m.bundled) {
+        if (items.length) items.push("-");
+        items.push({ label: "Delete from this Mac…", icon: "trash", action: "ask-delete-model", id: m.id, key: `del-${m.id}`, danger: true });
+      }
+    }
+    act = moreMenu(menuId, fullName(m.id), items);
+  }
+
+  const desc = d
+    ? `Downloading · <span class="num" id="dl-text">${fmtBytes(m.bytes * d.progress)}</span>`
+    : m.desc;
+
+  let extra = "";
+  if (sp.confirmDelete === m.id) {
+    const switching = sp.inUse === m.id;
+    extra = `
+      <span class="m-extra-text">${switching
+        ? `<b>${m.name}</b> is in use. Delete it and switch to ${fullName(FALLBACK_MODEL)}? Frees ${fmtBytes(m.bytes)}.`
+        : `Delete <b>${m.name}</b> from this Mac? Frees ${fmtBytes(m.bytes)}.`}</span>
+      <button class="btn btn-plain" data-action="cancel-delete-model" data-key="cancel-del-model">Cancel</button>
+      <button class="btn btn-primary" data-action="delete-model" data-id="${m.id}" data-key="confirm-del-model">Delete</button>`;
+  } else if (offering) {
+    extra = `
+      <span class="m-extra-text">${fullName(sp.inUse)} stays in use until <b>${m.name}</b> is downloaded.</span>
+      <button class="btn btn-plain" data-action="dl-dismiss" data-key="dl-dismiss">Not now</button>
+      <button class="btn btn-primary" data-action="dl-use" data-id="${m.id}" data-key="dl-start">Download ${fmtBytes(m.bytes)}</button>`;
+  }
+
+  return `
+    <div class="mrow" data-action="pick-model" data-id="${m.id}"${d ? "" : ` data-row-menu="row:model:${m.id}"`}>
+      <button class="radio-btn" role="radio" aria-checked="${sel}" tabindex="${m.id === tabStop ? 0 : -1}" data-action="pick-model" data-id="${m.id}" data-key="model-${m.id}"
+        aria-label="${fullName(m.id)}, ${fmtBytes(m.bytes)}, ${statusText}"><span class="radio${sel ? " is-on" : ""}" aria-hidden="true"></span></button>
+      <span class="m-name">${m.name}</span>
+      <span class="m-desc"${d ? "" : ` title="${esc(m.desc)}"`}>${desc}</span>
+      <span class="m-size mono num">${fmtBytes(m.bytes)}</span>
+      <span class="m-status">${status}</span>
+      <span class="m-act">${act}</span>
+      ${d ? `<span class="m-track" role="progressbar" aria-label="${fullName(m.id)} download" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" id="dl-prog"><span id="dl-bar" style="width:${d.progress * 100}%"></span></span>` : ""}
+      ${extra ? `<div class="m-extra" data-action="noop">${extra}</div>` : ""}
+    </div>`;
+}
+
+// `use` switches to the model once it's on disk (picking it); the row's download button only downloads.
+function startDownload(id, use) {
+  const sp = S.speech;
+  const m = model(id);
+  clearInterval(dlTimer);
+  if (use) sp.selected = id;
+  sp.confirmDelete = null;
+  sp.download = { id, progress: 0, use };
+  const step = 100 / (1500 + (m.bytes / 1e9) * 1500);
+  dlTimer = setInterval(() => {
+    const d = sp.download;
+    if (!d || d.id !== id) return clearInterval(dlTimer);
+    d.progress = Math.min(1, d.progress + step);
+    if (d.progress >= 1) {
+      clearInterval(dlTimer);
+      sp.download = null;
+      sp.downloaded[id] = true;
+      if (d.use && sp.selected === id) sp.inUse = id;
+      announce(`${fullName(id)} downloaded${sp.inUse === id ? ", now in use" : ""}`);
+      render();
+    } else {
+      paintProgress(d, m);
+    }
+  }, 100);
+  announce(`Downloading ${fullName(id)}`);
+  S.focusKey = "dl-cancel";
+  render();
+}
+
+function paintProgress(d, m) {
+  const bar = $("#dl-bar");
+  if (!bar) return;
+  const pct = Math.round(d.progress * 100);
+  bar.style.width = `${d.progress * 100}%`;
+  $("#dl-prog").setAttribute("aria-valuenow", pct);
+  $("#dl-text").textContent = fmtBytes(m.bytes * d.progress);
+  $("#dl-pct").textContent = `${pct}%`;
+}
+
+// ───────────── Settings ─────────────
+
+function settingsBody() {
+  const st = S.settings;
+  const n = S.entries.length;
+  const langOpen = S.menu === "lang";
+  const langLabel = LANGS.find(([k]) => k === st.language)[1];
+  const clear = st.clearConfirm
+    ? `<button class="btn btn-plain" data-action="clear-cancel" data-key="clear-cancel">Cancel</button>
+       <button class="btn btn-primary" data-action="clear-all" data-key="clear-all">Delete all</button>`
+    : `<button class="btn btn-ghost" data-action="clear-ask" data-key="clear-ask"${n ? "" : " disabled"}>Clear…</button>`;
+  return `
+    <section class="group" aria-labelledby="g-trans">
+      <h2 class="group-title" id="g-trans">Transcription</h2>
+      <div class="setting lang">
+        <div class="setting-text">
+          <div class="setting-label" id="lang-label">Language</div>
+          <div class="setting-desc">Auto-detect works for most speech. Pin a language if it guesses wrong.</div>
+        </div>
+        <div class="setting-control picker-wrap">
+          <button class="picker" data-action="menu" data-menu="lang" data-key="lang" aria-haspopup="menu" aria-expanded="${langOpen}" aria-label="Language: ${langLabel}">
+            <span class="picker-label">${langLabel}</span>${icon("chevron", 12)}
+          </button>
+          ${langOpen ? `
+          <div class="menu" role="menu" aria-label="Language">
+            ${LANGS.map(([k, label], i) => `
+              <button class="menu-item" role="menuitemradio" aria-checked="${k === st.language}" tabindex="-1" data-action="pick-lang" data-value="${k}" data-key="lang-${i}">${icon("check", 13, 2.5).replace('class="i"', 'class="i check"')}<span>${label}</span></button>
+              ${k === "auto" ? '<div class="menu-sep" role="separator"></div>' : ""}`).join("")}
+          </div>` : ""}
+        </div>
+      </div>
+    </section>
+    <section class="group" aria-labelledby="g-gen">
+      <h2 class="group-title" id="g-gen">General</h2>
+      <div class="setting">
+        <div class="setting-text">
+          <div class="setting-label">Launch at login</div>
+          <div class="setting-desc">Start Shh.. in the menu bar when you log in.</div>
+        </div>
+        <div class="setting-control">${switchHTML("login-switch", st.launchAtLogin, "Launch at login", 'data-action="login-toggle"')}</div>
+      </div>
+      <div class="setting">
+        <div class="setting-text">
+          <div class="setting-label">Clear history</div>
+          <div class="setting-desc${st.clearConfirm ? " is-warn" : ""}">${st.clearConfirm
+            ? `Delete all ${n} dictation${n === 1 ? "" : "s"}? This can't be undone.`
+            : n ? `${n} dictation${n === 1 ? "" : "s"} stored on this Mac.` : "No dictations stored."}</div>
+        </div>
+        <div class="setting-control">${clear}</div>
+      </div>
+    </section>`;
+}
+
+// ───────────── Help ─────────────
+
+function helpBody() {
+  const keys = ks => ks.map(k => `<kbd>${k}</kbd>`).join("");
+  const shortcut = (label, ks, note = "") => `
+    <div class="setting">
+      <div class="setting-text"><div class="setting-label">${label}</div></div>
+      <div class="keys">${note ? `<span class="kbd-note">${note}</span>` : ""}${keys(ks)}</div>
+    </div>`;
+  const step = (n, title, desc, link) => `
+    <div class="setting step">
+      <span class="step-num">${n}</span>
+      <div class="setting-text">
+        <div class="setting-label">${title}</div>
+        <div class="setting-desc">${desc}</div>
+      </div>
+      ${link || ""}
+    </div>`;
+  return `
+    <section class="group" aria-labelledby="g-start">
+      <h2 class="group-title" id="g-start">Getting started</h2>
+      ${step(1, "Hold fn and speak", "Release to transcribe. The text is copied to your clipboard, ready to paste.")}
+      ${step(2, "Create a style", "Styles rewrite what you said, like turning a ramble into an email.", '<a class="link" href="#styles">Open Styles</a>')}
+      ${step(3, "Connect a provider", "Styles need an AI provider. Transcription itself never leaves your Mac.", '<a class="link" href="#providers">Open Providers</a>')}
+    </section>
+    <section class="group" aria-labelledby="g-keys">
+      <h2 class="group-title" id="g-keys">Keyboard shortcuts</h2>
+      ${shortcut("Record while held", ["fn"], "hold")}
+      ${shortcut("Cancel recording", ["esc"])}
+      ${shortcut("Open the dashboard from the menu bar", ["⌘", "D"])}
+      ${shortcut("Quit Shh..", ["⌘", "Q"])}
+    </section>
+    <section class="group" aria-labelledby="g-about">
+      <h2 class="group-title" id="g-about">About</h2>
+      <p class="about">Shh.. turns speech into text on your Mac with on-device models like Whisper, and can rewrite it with an AI style before you paste.</p>
+      <p class="version mono">Version 1.0</p>
+    </section>`;
+}
+
+// ───────────── Menus ─────────────
+
+function openMenu(id) {
+  S.menu = id;
+  if (id.startsWith("row:")) {
+    render();
+    $(".menu-row .menu-item:not(:disabled)")?.focus();
+    return;
+  }
+  const items = id === "lang" ? LANGS.map(([k]) => k) : provider(id.slice(6)).models;
+  const current = id === "lang" ? S.settings.language : provider(id.slice(6)).model;
+  const i = Math.max(0, items.indexOf(current));
+  S.focusKey = id === "lang" ? `lang-${i}` : `opt-${id.slice(6)}-${i}`;
+  render();
+}
+
+// Closes without a re-render so a click that started on another control still lands.
+function closeMenus(refocus) {
+  const id = S.menu;
+  if (!id) return;
+  S.menu = null;
+  document.querySelectorAll(".menu").forEach(m => m.remove());
+  document.querySelectorAll('[aria-haspopup="menu"][aria-expanded="true"]').forEach(b => b.setAttribute("aria-expanded", "false"));
+  if (refocus) $(`[data-menu="${id}"]`)?.focus();
+}
+
+function placeMenus() {
+  const scroller = $("#scroll");
+  if (!scroller) return;
+  document.querySelectorAll(".menu").forEach(menu => {
+    if (menu.getBoundingClientRect().bottom > scroller.getBoundingClientRect().bottom - 8) menu.classList.add("is-up");
+  });
+}
+
+// ───────────── Actions ─────────────
+
+const ACTIONS = {
+  noop() {},
+  "clear-search"() {
+    S.search = "";
+    const input = $("#search");
+    if (input) input.value = "";
+    refreshHistory();
+    input?.focus();
+  },
+  copy(btn) {
+    const e = S.entries.find(x => x.id === btn.dataset.id);
+    const text = e.raw && S.showRaw[e.id] ? e.raw : e.text;
+    navigator.clipboard?.writeText(text).catch(() => {});
+    S.copiedId = e.id;
+    announce("Copied to clipboard");
+    refreshHistory();
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => { S.copiedId = null; refreshHistory(); }, 1400);
+  },
+  "toggle-raw"(btn) {
+    const id = btn.dataset.id;
+    S.showRaw[id] = !S.showRaw[id];
+    refreshHistory();
+  },
+  "delete-entry"(btn) {
+    const index = S.entries.findIndex(x => x.id === btn.dataset.id);
+    const [entry] = S.entries.splice(index, 1);
+    S.undo = { entry, index };
+    S.notice = null;
+    announce("Dictation deleted");
+    refreshHistory();
+    renderToast();
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { S.undo = null; renderToast(); }, 5000);
+  },
+  undo() {
+    if (!S.undo) return;
+    S.entries.splice(S.undo.index, 0, S.undo.entry);
+    S.undo = null;
+    clearTimeout(toastTimer);
+    announce("Dictation restored");
+    render();
+  },
+
+  "pick-style"(btn) {
+    const id = btn.dataset.id || null;
+    S.activeStyle = id;
+    S.styleConfirm = null;
+    S.focusKey = `style-${id || "none"}`;
+    announce(id ? `${activeStyle().name} is active` : "No style");
+    render();
+  },
+  "new-style"() {
+    // Switch now so this render already draws the editor and can focus it; hashchange re-renders the same page.
+    if (S.page !== "styles") { S.page = "styles"; location.hash = "#styles"; }
+    S.styleEdit = { id: "new", name: "", prompt: "" };
+    S.styleConfirm = null;
+    S.focusKey = "draft-name";
+    render();
+  },
+  "edit-style"(btn) {
+    const s = S.styles.find(x => x.id === btn.dataset.id);
+    S.styleEdit = { id: s.id, name: s.name, prompt: s.prompt };
+    S.styleConfirm = null;
+    S.focusKey = "draft-name";
+    render();
+  },
+  "cancel-edit"() {
+    const id = S.styleEdit?.id;
+    S.styleEdit = null;
+    S.focusKey = id && id !== "new" ? `style-${id}` : "new-style";
+    render();
+  },
+  "save-style"() { saveStyle(); },
+  "ask-delete-style"(btn) {
+    S.styleConfirm = btn.dataset.id;
+    S.focusKey = "cancel-del";
+    render();
+  },
+  "cancel-delete-style"() {
+    const id = S.styleConfirm;
+    S.styleConfirm = null;
+    S.focusKey = `style-${id}`;
+    render();
+  },
+  "delete-style"(btn) {
+    const id = btn.dataset.id;
+    const s = S.styles.find(x => x.id === id);
+    S.styles = S.styles.filter(x => x.id !== id);
+    if (S.activeStyle === id) S.activeStyle = null;
+    S.styleConfirm = null;
+    S.focusKey = `style-${S.activeStyle || "none"}`;
+    announce(`Deleted ${s.name}`);
+    render();
+  },
+
+  expand(btn) {
+    const id = btn.dataset.id;
+    const opening = S.expanded !== id;
+    S.expanded = opening ? id : null;
+    S.menu = null;
+    const p = provider(id);
+    S.focusKey = opening ? `in-${id}-${p.kind === "cloud" ? "apiKey" : "endpoint"}` : `exp-${id}`;
+    render();
+  },
+  menu(btn) {
+    const id = btn.dataset.menu;
+    if (S.menu === id) closeMenus(true);
+    else openMenu(id);
+  },
+  "pick-llm"(btn) {
+    const p = provider(btn.dataset.id);
+    p.model = btn.dataset.value;
+    S.menu = null;
+    S.focusKey = `picker-${p.id}`;
+    announce(`${p.name} model: ${p.model}`);
+    render();
+  },
+  fetch(btn) { fetchModels(btn.dataset.id); },
+  "provider-toggle"(btn) {
+    const p = provider(btn.dataset.id);
+    const turningOn = S.activeProvider !== p.id;
+    const configured = (p.kind === "cloud" ? p.apiKey : p.endpoint).trim() !== "";
+    if (turningOn && !configured) {
+      S.expanded = p.id;
+      S.focusKey = `in-${p.id}-${p.kind === "cloud" ? "apiKey" : "endpoint"}`;
+      announce(`Add connection details to use ${p.name}`);
+      render();
+      return;
+    }
+    S.activeProvider = turningOn ? p.id : null;
+    announce(`${p.name} ${turningOn ? "active" : "off"}`);
+    animateSwitches(() => render());
+  },
+
+  "speech-toggle"() {
+    S.speech.enabled = !S.speech.enabled;
+    S.focusKey = "speech-switch";
+    announce(`Transcription ${S.speech.enabled ? "on" : "off"}`);
+    animateSwitches(() => render());
+  },
+  "toggle-engine"(btn) {
+    const id = btn.dataset.id;
+    S.speech.open[id] = !S.speech.open[id];
+    S.focusKey = `engine-${id}`;
+    render();
+  },
+  "pick-model"(btn) {
+    const sp = S.speech;
+    const id = btn.dataset.id;
+    sp.selected = id;
+    sp.confirmDelete = null;
+    if (sp.downloaded[id]) {
+      sp.inUse = id;
+      announce(`Using ${fullName(id)}`);
+    } else if (sp.download && sp.download.id === id) {
+      sp.download.use = true;
+      announce(`${fullName(id)} will be used once it's downloaded`);
+    } else {
+      announce(`${fullName(id)} isn't downloaded yet`);
+    }
+    S.focusKey = `model-${id}`;
+    render();
+  },
+  dl(btn) { startDownload(btn.dataset.id, false); },
+  "dl-use"(btn) { startDownload(btn.dataset.id, true); },
+  "dl-cancel"() {
+    const sp = S.speech;
+    const id = sp.download.id;
+    clearInterval(dlTimer);
+    announce(`${fullName(id)} download canceled`);
+    sp.download = null;
+    sp.selected = sp.inUse;
+    S.focusKey = `dl-${id}`;
+    render();
+  },
+  "dl-dismiss"() {
+    const sp = S.speech;
+    sp.selected = sp.inUse;
+    S.focusKey = `model-${sp.inUse}`;
+    render();
+  },
+  "ask-delete-model"(btn) {
+    const sp = S.speech;
+    sp.confirmDelete = btn.dataset.id;
+    if (!sp.downloaded[sp.selected]) sp.selected = sp.inUse;   // one inline prompt at a time
+    S.focusKey = "cancel-del-model";
+    render();
+  },
+  "cancel-delete-model"() {
+    const id = S.speech.confirmDelete;
+    S.speech.confirmDelete = null;
+    S.focusKey = `del-${id}`;
+    render();
+  },
+  "delete-model"(btn) {
+    const sp = S.speech;
+    const id = btn.dataset.id;
+    const m = model(id);
+    const wasInUse = sp.inUse === id;
+    delete sp.downloaded[id];
+    sp.confirmDelete = null;
+    if (wasInUse) {
+      sp.inUse = FALLBACK_MODEL;
+      sp.open[model(FALLBACK_MODEL).engine.id] = true;
+    }
+    if (sp.selected === id) sp.selected = sp.inUse;
+    S.focusKey = `dl-${id}`;
+    const note = `Deleted <b>${fullName(id)}</b> · ${fmtBytes(m.bytes)} freed${wasInUse ? ` · now using ${fullName(sp.inUse)}` : ""}`;
+    announce(note.replace(/<\/?b>/g, ""));
+    render();
+    showNotice(note);
+  },
+
+  "pick-lang"(btn) {
+    S.settings.language = btn.dataset.value;
+    S.menu = null;
+    S.focusKey = "lang";
+    render();
+  },
+  "login-toggle"() {
+    S.settings.launchAtLogin = !S.settings.launchAtLogin;
+    animateSwitches(() => render());
+  },
+  "clear-ask"() { S.settings.clearConfirm = true; S.focusKey = "clear-cancel"; render(); },
+  "clear-cancel"() { S.settings.clearConfirm = false; S.focusKey = "clear-ask"; render(); },
+  "clear-all"() {
+    S.entries = [];
+    S.undo = null;
+    S.settings.clearConfirm = false;
+    S.focusKey = "clear-ask";
+    announce("History cleared");
+    render();
+  },
+};
+
+// Lets a switch slide before the page re-renders under it.
+function animateSwitches(then) {
+  const want = {
+    "speech-switch": S.speech.enabled,
+    "login-switch": S.settings.launchAtLogin,
+    ...Object.fromEntries(S.providers.map(p => [`switch-${p.id}`, S.activeProvider === p.id])),
+  };
+  let moved = false;
+  document.querySelectorAll(".switch[data-key]").forEach(sw => {
+    const on = want[sw.dataset.key];
+    if (on === undefined || String(on) === sw.getAttribute("aria-checked")) return;
+    sw.setAttribute("aria-checked", String(on));
+    moved = true;
+  });
+  if (moved && !reducedMotion()) setTimeout(then, 150);
+  else then();
+}
+
+// ───────────── Events ─────────────
+
+addEventListener("pointerdown", () => { document.documentElement.dataset.input = "pointer"; }, true);
+addEventListener("keydown", () => { document.documentElement.dataset.input = "keyboard"; }, true);
+
+document.addEventListener("pointerdown", e => {
+  if (S.menu && !e.target.closest(".picker-wrap")) closeMenus(false);
+}, true);
+
+document.addEventListener("click", e => {
+  const target = e.target.closest("[data-action]");
+  if (!target || !ACTIONS[target.dataset.action]) return;
+  if (target.matches(".prov-main") && e.target.closest(".disclosure")) return;
+  e.preventDefault();
+  // A pick from a row menu closes it first, then hands focus back to its "…" button.
+  const fromMenu = target.closest(".menu-row") ? S.menu : null;
+  if (fromMenu) S.menu = null;
+  ACTIONS[target.dataset.action](target, e);
+  if (fromMenu && (!document.activeElement || document.activeElement === document.body)) {
+    $(`[data-menu="${fromMenu}"]`)?.focus({ preventScroll: true });
+  }
+});
+
+// Right-click a row for the same actions as its "…" button.
+document.addEventListener("contextmenu", e => {
+  const row = e.target.closest("[data-row-menu]");
+  if (!row || e.target.closest("input, textarea")) return;
+  const id = row.dataset.rowMenu;
+  if (!$(`[data-menu="${id}"]`)) return;
+  e.preventDefault();
+  document.documentElement.dataset.input = "pointer";
+  if (S.menu !== id) openMenu(id);
+});
+
+document.addEventListener("input", e => {
+  const t = e.target;
+  if (t.id === "search") {
+    S.search = t.value;
+    refreshHistory();
+  } else if (t.dataset.draft) {
+    S.styleEdit[t.dataset.draft] = t.value;
+    const save = $('[data-key="save-style"]');
+    if (save) save.disabled = !S.styleEdit.name.trim();
+  } else if (t.dataset.field) {
+    const p = provider(t.dataset.id);
+    p[t.dataset.field] = t.value;
+    p.status = null;
+    const meta = t.closest(".prov").querySelector(".prov-meta");
+    if (meta) meta.innerHTML = providerMeta(p);
+  }
+});
+
+document.addEventListener("keydown", e => {
+  const t = e.target;
+  const mod = e.metaKey || e.ctrlKey;
+
+  if (mod && e.key.toLowerCase() === "f") {
+    e.preventDefault();
+    if (S.page !== "home") { S.focusKey = "search"; location.hash = "#home"; }
+    else $("#search")?.focus();
+    return;
+  }
+  if (mod && e.key.toLowerCase() === "n" && !S.styleEdit) {
+    e.preventDefault();
+    ACTIONS["new-style"]();
+    return;
+  }
+  if (mod && e.key === "Enter" && t.dataset.draft) {
+    e.preventDefault();
+    saveStyle();
+    return;
+  }
+
+  const menu = t.closest(".menu");
+  if (menu) {
+    const items = [...menu.querySelectorAll(".menu-item")];
+    const at = items.indexOf(document.activeElement);
+    const go = j => items[(j + items.length) % items.length].focus();
+    if (e.key === "ArrowDown") { e.preventDefault(); go(at + 1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); go(at - 1); }
+    else if (e.key === "Home") { e.preventDefault(); go(0); }
+    else if (e.key === "End") { e.preventDefault(); go(items.length - 1); }
+    else if (e.key === "Escape") { e.preventDefault(); closeMenus(true); }
+    else if (e.key === "Tab") closeMenus(false);
+    return;
+  }
+  if (t.matches('[aria-haspopup="menu"]') && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+    e.preventDefault();
+    openMenu(t.dataset.menu);
+    return;
+  }
+
+  if (t.matches('[role="radio"]') && ["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+    e.preventDefault();
+    const radios = [...t.closest('[role="radiogroup"]').querySelectorAll('[role="radio"]')];
+    const step = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : -1;
+    const next = radios[(radios.indexOf(t) + step + radios.length) % radios.length];
+    ACTIONS[next.dataset.action](next);
+    return;
+  }
+
+  if (t.matches(".conn .input") && e.key === "Enter") {
+    e.preventDefault();
+    fetchModels(t.dataset.id);
+    return;
+  }
+
+  if (e.key === "Escape") {
+    if (S.styleEdit) { e.preventDefault(); ACTIONS["cancel-edit"](); }
+    else if (S.styleConfirm) { e.preventDefault(); ACTIONS["cancel-delete-style"](); }
+    else if (S.settings.clearConfirm) { e.preventDefault(); ACTIONS["clear-cancel"](); }
+    else if (S.speech.confirmDelete) { e.preventDefault(); ACTIONS["cancel-delete-model"](); }
+    else if (t.closest(".conn")) { e.preventDefault(); ACTIONS.expand({ dataset: { id: S.expanded } }); }
+    else if (t.id === "search" && S.search) { e.preventDefault(); ACTIONS["clear-search"](); }
+  }
+});
+
+window.addEventListener("hashchange", () => {
+  S.page = pageFromHash();
+  S.menu = null;
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
