@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var entries: [DictationEntry]
     @AppStorage("transcriptionLanguage") private var transcriptionLanguage = "auto"
+    @AppStorage("muteAudioWhileRecording") private var muteAudioWhileRecording = true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var isConfirmingClear = false
 
@@ -38,6 +39,14 @@ struct SettingsView: View {
                             .labelsHidden()
                         }
                         .accessibilityLabel("Language: \(currentLanguageLabel)")
+                    }
+                    SettingRow(
+                        "Mute sound while recording",
+                        description: "Silence your Mac while you speak so nothing it plays gets picked up. Sound comes back when you stop."
+                    ) {
+                        Toggle("Mute sound while recording", isOn: $muteAudioWhileRecording)
+                            .toggleStyle(.graphiteSwitch)
+                            .labelsHidden()
                     }
                 }
 

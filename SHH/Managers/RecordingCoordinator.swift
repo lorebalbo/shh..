@@ -7,7 +7,9 @@ import SwiftData
 /// to RecordingStateMachine transitions, and connecting those transitions
 /// to AudioCaptureManager and TranscriptionPipeline.
 ///
-/// On recording start, AudioCaptureManager begins capturing. On recording stop,
+/// On recording start, the Mac's sound is muted (unless turned off in Settings)
+/// and AudioCaptureManager begins capturing; the sound comes back when the
+/// recording stops, is cancelled, or is interrupted. On recording stop,
 /// the captured audio is dispatched to TranscriptionPipeline on a background
 /// queue. After transcription, the RAW text flows through TextProcessingPipeline
 /// for Style-based LLM processing, and the result is persisted to SwiftData.
@@ -19,6 +21,7 @@ final class RecordingCoordinator {
     let transcriptionPipeline: TranscriptionPipeline
     let textProcessingPipeline: TextProcessingPipeline?
     let clipboardManager: ClipboardManager
+    let audioMuter: SystemAudioMuter
     private let modelContext: ModelContext?
     private let logger = Logger(subsystem: "com.shh", category: "pipeline")
 
@@ -39,12 +42,14 @@ final class RecordingCoordinator {
         transcriptionPipeline: TranscriptionPipeline,
         textProcessingPipeline: TextProcessingPipeline? = nil,
         clipboardManager: ClipboardManager = ClipboardManager(),
+        audioMuter: SystemAudioMuter = SystemAudioMuter(),
         modelContext: ModelContext? = nil
     ) {
         self.audioCaptureManager = audioCaptureManager
         self.transcriptionPipeline = transcriptionPipeline
         self.textProcessingPipeline = textProcessingPipeline
         self.clipboardManager = clipboardManager
+        self.audioMuter = audioMuter
         self.modelContext = modelContext
         setupBindings()
     }
@@ -67,6 +72,7 @@ final class RecordingCoordinator {
     func shutdown() {
         inputManager.stop()
         _ = audioCaptureManager.stopRecording()
+        audioMuter.restore()
         // Drain any in-flight transcription so the WhisperTranscriber has no
         // active callers before we release it.
         processingQueue.sync {}
@@ -100,6 +106,11 @@ final class RecordingCoordinator {
         UserDefaults.standard.object(forKey: "transcriptionEnabled") as? Bool ?? true
     }
 
+    /// The Settings "Mute sound while recording" switch.
+    private var isMuteWhileRecordingEnabled: Bool {
+        UserDefaults.standard.object(forKey: "muteAudioWhileRecording") as? Bool ?? true
+    }
+
     private func setupBindings() {
         // Wire input events → state machine
         inputManager.onFnPress = { [weak self] in
@@ -120,6 +131,9 @@ final class RecordingCoordinator {
         // Wire state machine → audio capture + transcription pipeline
         stateMachine.onRecordingDidStart = { [weak self] in
             guard let self else { return }
+            if self.isMuteWhileRecordingEnabled {
+                self.audioMuter.mute()
+            }
             do {
                 try self.audioCaptureManager.startRecording()
                 self.logger.info("Audio capture started")
@@ -127,6 +141,7 @@ final class RecordingCoordinator {
             } catch {
                 self.logger.error("Audio capture failed to start: \(error.localizedDescription)")
                 PipelineEventLog.shared.append("❌ Recording failed to start: \(error.localizedDescription)", kind: .error)
+                self.audioMuter.restore()
                 self.stateMachine.forceIdle()
                 self.onError?(error)
             }
@@ -135,6 +150,7 @@ final class RecordingCoordinator {
         stateMachine.onRecordingDidStop = { [weak self] mode in
             guard let self else { return }
             let audioBuffer = self.audioCaptureManager.stopRecording()
+            self.audioMuter.restore()
             let duration = String(format: "%.1f", Double(audioBuffer.count) / 16_000.0)
             self.logger.info("Recording stopped: \(audioBuffer.count) samples (\(duration)s)")
             PipelineEventLog.shared.append("⏹ Stopped — \(audioBuffer.count) samples (\(duration)s)")
@@ -152,6 +168,7 @@ final class RecordingCoordinator {
         stateMachine.onRecordingDidCancel = { [weak self] in
             guard let self else { return }
             _ = self.audioCaptureManager.stopRecording()
+            self.audioMuter.restore()
             self.logger.info("Recording cancelled")
             PipelineEventLog.shared.append("🚫 Recording cancelled")
         }
@@ -159,6 +176,7 @@ final class RecordingCoordinator {
         // Handle audio interruptions (e.g. microphone disconnect mid-recording)
         audioCaptureManager.onInterruption = { [weak self] audioBuffer, _ in
             guard let self else { return }
+            self.audioMuter.restore()
 
             let mode: RecordingMode
             switch self.stateMachine.state {

@@ -66,6 +66,7 @@ targets:
       - path: SHH/Managers/TranscriptionChunker.swift
       - path: SHH/Managers/TranscriptStitcher.swift
       - path: SHH/Managers/DecodeConfig.swift
+      - path: SHH/Managers/SystemAudioMuter.swift
       - path: SHH/Overlay
       - path: SHH/Views/Color+App.swift
       - path: SHH/Views/FontExtension.swift
