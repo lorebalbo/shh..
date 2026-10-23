@@ -68,6 +68,7 @@ targets:
       - path: SHH/Managers/DecodeConfig.swift
       - path: SHH/Managers/SystemAudioMuter.swift
       - path: SHH/Managers/GlobalInputManager.swift
+      - path: SHH/Managers/TranscriptionQueue.swift
       - path: SHH/Overlay
       - path: SHH/Views/Color+App.swift
       - path: SHH/Views/FontExtension.swift

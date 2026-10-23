@@ -114,7 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               pickerController.isVisible,
               let overlayController = overlayController else { return }
 
-        pickerController.updatePosition(relativeTo: overlayController.panelWindow.frame)
+        pickerController.updatePosition(relativeTo: overlayController.anchorFrame)
     }
 
     /// Returns true when every permission required by the app has been granted.
@@ -217,9 +217,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         coordinator.onTranscriptionComplete = { text, mode in
-            DispatchQueue.main.async {
-                vm.isProcessing = false
-            }
             NotificationCenter.default.post(
                 name: .shhTranscriptionDidComplete,
                 object: nil,
@@ -228,14 +225,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         coordinator.onError = { error in
-            DispatchQueue.main.async {
-                vm.isProcessing = false
-            }
             NotificationCenter.default.post(
                 name: .shhRecordingError,
                 object: nil,
                 userInfo: ["error": error]
             )
+        }
+
+        // The widget's spinner and "N processing" badge follow the transcription queue.
+        coordinator.transcriptionQueue.onPendingCountChange = { count in
+            vm.processingCount = count
         }
 
         coordinator.start()
@@ -258,13 +257,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             originalOnStop?(mode)
             DispatchQueue.main.async {
                 vm.isRecording = false
-                vm.isProcessing = true
             }
         }
         coordinator.stateMachine.onForcedIdle = {
             DispatchQueue.main.async {
                 vm.isRecording = false
-                vm.isProcessing = false
             }
         }
         let originalOnCancel = coordinator.stateMachine.onRecordingDidCancel
@@ -272,7 +269,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             originalOnCancel?()
             DispatchQueue.main.async {
                 vm.isRecording = false
-                vm.isProcessing = false
             }
         }
 
@@ -340,8 +336,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         let context = ModelContext(container)
                         pickerVM.reload(from: context)
                     }
-                    let widgetFrame = widgetCtrl.panelWindow.frame
-                    pickerCtrl.show(relativeTo: widgetFrame)
+                    pickerCtrl.show(relativeTo: widgetCtrl.anchorFrame)
                 }
             }
         }
@@ -368,6 +363,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async {
                 vm.isRecording = false
                 pickerCtrl.hide()
+            }
+        }
+
+        // Keep the picker clear of the "N processing" badge as it comes and goes.
+        widgetController.onBadgeChanged = {
+            if pickerCtrl.isVisible {
+                pickerCtrl.updatePosition(relativeTo: widgetCtrl.anchorFrame)
             }
         }
 
