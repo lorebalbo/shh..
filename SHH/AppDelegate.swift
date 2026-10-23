@@ -155,7 +155,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSColor(srgbRed: 242 / 255.0, green: 106 / 255.0, blue: 75 / 255.0, alpha: 1.0),
             NSColor(srgbRed: 233 / 255.0, green: 79 / 255.0, blue: 55 / 255.0, alpha: 1.0),
         ]
-        let fgColor = NSColor(red: 30 / 255.0, green: 27 / 255.0, blue: 24 / 255.0, alpha: 1.0)
+        let fgColor = NSColor(srgbRed: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)
 
         return NSImage(size: canvasSize, flipped: false) { rect in
             // Apple icon grid: squircle inset ~100pt from each edge → 824×824 shape.
@@ -187,7 +187,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 width: scaledWidth,
                 height: targetHeight
             )
-            // Tint near-black: draw the mark's alpha, then paint the colour through it.
+            // Tint white: draw the mark's alpha, then paint the colour through it.
             context.beginTransparencyLayer(auxiliaryInfo: nil)
             mark.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1.0)
             fgColor.setFill()

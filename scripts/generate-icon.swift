@@ -93,7 +93,7 @@ func makeIcon(pixels: Int) -> CGImage {
     )
     ctx.restoreGState()
 
-    // Mark, tinted near-black: draw its alpha, then paint the colour through it.
+    // Mark, tinted white: draw its alpha, then paint the colour through it.
     let markH = iconRect.height * markHeightRatio
     let markW = markH * CGFloat(markImage.width) / CGFloat(markImage.height)
     let markRect = CGRect(
@@ -105,7 +105,7 @@ func makeIcon(pixels: Int) -> CGImage {
     ctx.beginTransparencyLayer(auxiliaryInfo: nil)
     ctx.draw(markImage, in: markRect)
     ctx.setBlendMode(.sourceIn)
-    ctx.setFillColor(CGColor(srgbRed: 30/255.0, green: 27/255.0, blue: 24/255.0, alpha: 1.0))
+    ctx.setFillColor(CGColor(srgbRed: 1.0, green: 1.0, blue: 1.0, alpha: 1.0))
     ctx.fill(markRect)
     ctx.endTransparencyLayer()
 

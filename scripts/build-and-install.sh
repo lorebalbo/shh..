@@ -74,8 +74,11 @@ if [ -z "$APP_PATH" ]; then
     exit 1
 fi
 
-# Overwrite previous installation (cp -R overwrites existing contents)
-cp -Rf "$APP_PATH" /Applications/
+# Replace the previous installation with a fresh copy. Copying over it keeps the
+# old bundle's modification date, and macOS only refreshes its cached app icon
+# (Dock, System Settings, Finder) when that date changes.
+rm -rf "/Applications/${APP_NAME}.app"
+cp -R "$APP_PATH" /Applications/
 
 # Refresh LaunchServices so macOS picks up the correct name and icon immediately
 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister \
