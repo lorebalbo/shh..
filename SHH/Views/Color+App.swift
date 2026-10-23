@@ -1,33 +1,5 @@
 import SwiftUI
 
-// MARK: - Custom Toggle Style
-
-struct AppToggleStyle: ToggleStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack {
-            configuration.label
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    configuration.isOn.toggle()
-                }
-            }) {
-                ZStack {
-                    Capsule()
-                        .fill(configuration.isOn ? Color.appError : Color.appForeground.opacity(0.25))
-                        .frame(width: 38, height: 22)
-                    Circle()
-                        .fill(.white)
-                        .shadow(radius: 1)
-                        .frame(width: 18, height: 18)
-                        .offset(x: configuration.isOn ? 8 : -8)
-                        .animation(.easeInOut(duration: 0.15), value: configuration.isOn)
-                }
-            }
-            .buttonStyle(.plain)
-        }
-    }
-}
-
 // MARK: - Colors
 
 extension Color {

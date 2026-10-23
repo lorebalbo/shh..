@@ -75,6 +75,7 @@ final class RecordingCoordinator {
 
     /// Enters lock-in recording mode directly (e.g., from overlay widget tap).
     func startLockIn() {
+        guard isTranscriptionEnabled else { return }
         stateMachine.startLockIn()
     }
 
@@ -93,10 +94,18 @@ final class RecordingCoordinator {
 
     // MARK: - Private
 
+    /// The dashboard's "On-device transcription" switch. When off, fn is left to macOS
+    /// and no new recording starts; one already in progress can still finish.
+    private var isTranscriptionEnabled: Bool {
+        UserDefaults.standard.object(forKey: "transcriptionEnabled") as? Bool ?? true
+    }
+
     private func setupBindings() {
         // Wire input events → state machine
         inputManager.onFnPress = { [weak self] in
-            self?.stateMachine.handleFnPress() ?? false
+            guard let self else { return false }
+            if self.stateMachine.state == .idle && !self.isTranscriptionEnabled { return false }
+            return self.stateMachine.handleFnPress()
         }
         inputManager.onFnRelease = { [weak self] in
             self?.stateMachine.handleFnRelease() ?? false

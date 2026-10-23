@@ -1,105 +1,292 @@
-import SwiftUI
-import SwiftData
 import AppKit
-import AVFoundation
+import SwiftData
+import SwiftUI
 
 struct HomeView: View {
+    @Environment(DashboardModel.self) private var dashboard
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \DictationEntry.timestamp, order: .reverse) private var entries: [DictationEntry]
+    @Query private var styles: [Style]
     @State private var searchText = ""
+    @FocusState private var isSearchFocused: Bool
+    @State private var showingOriginal: Set<UUID> = []
+    @State private var copiedID: UUID?
+    @State private var copyResetTask: Task<Void, Never>?
     #if DEBUG
     @AppStorage("showDiagnostics") private var showDiagnostics = false
     #endif
 
+    private var query: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private var filteredEntries: [DictationEntry] {
-        if searchText.isEmpty { return entries }
-        let query = searchText.lowercased()
+        guard !query.isEmpty else { return entries }
         return entries.filter { entry in
-            entry.rawText.lowercased().contains(query)
-            || (entry.processedText?.lowercased().contains(query) ?? false)
+            entry.rawText.localizedCaseInsensitiveContains(query)
+                || (entry.processedText?.localizedCaseInsensitiveContains(query) ?? false)
         }
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            if filteredEntries.isEmpty {
-                emptyState
-            } else {
-                entryList
-            }
-            #if DEBUG
-            Divider()
-            diagnosticPanel
-            #endif
+        PageScaffold(.home) {
+            searchField
+        } content: {
+            history
         }
-        .background(Color.appBackground)
+        #if DEBUG
+        .safeAreaInset(edge: .bottom, spacing: 0) { diagnosticPanel }
+        #endif
+        .onAppear { focusSearchIfRequested() }
+        .onChange(of: dashboard.wantsSearchFocus) { focusSearchIfRequested() }
     }
 
-    // MARK: - Header
+    private func focusSearchIfRequested() {
+        guard dashboard.wantsSearchFocus else { return }
+        dashboard.wantsSearchFocus = false
+        // The field may not be in the window yet when Home has just been opened.
+        DispatchQueue.main.async { isSearchFocused = true }
+    }
 
-    private var header: some View {
-        HStack(spacing: 12) {
-            Text("Home")
-                .font(Font.appHeadline)
-                .fontWeight(.bold)
-                .foregroundStyle(Color.appForeground)
-                .alignmentGuide(VerticalAlignment.center) { d in
-                    d[.firstTextBaseline] / 2
-                }
-            Spacer()
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(Font.appCaption)
-                    .foregroundStyle(Color.appForeground.opacity(0.4))
-                TextField("", text: $searchText, prompt: Text("Search dictations").foregroundStyle(Color.appForeground.opacity(0.45)))
-                    .font(Font.appCallout)
-                    .textFieldStyle(.plain)
-                    .colorScheme(.light) // Forces the system text field to use dark text/placeholder against our light background
-                    .foregroundStyle(Color.appForeground)
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(Font.appCaption)
-                            .foregroundStyle(Color.appForeground.opacity(0.4))
+    // MARK: - Search
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Graphite.text3)
+            TextField("Search dictations", text: $searchText, prompt: Text(""))
+                .textFieldStyle(.plain)
+                .font(.inter(13.5))
+                .foregroundStyle(Graphite.text)
+                .focused($isSearchFocused)
+                .focusEffectDisabled()
+                .onExitCommand { searchText = "" }
+                .overlay(alignment: .leading) {
+                    if searchText.isEmpty {
+                        Text("Search")
+                            .font(.inter(13.5))
+                            .foregroundStyle(Graphite.text3)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
                     }
-                    .buttonStyle(.plain)
                 }
+            if searchText.isEmpty {
+                Text("⌘F")
+                    .font(.inter(12))
+                    .foregroundStyle(Graphite.text3)
+                    .padding(.trailing, 5)
+                    .accessibilityHidden(true)
+            } else {
+                Button {
+                    searchText = ""
+                    isSearchFocused = true
+                } label: {
+                    Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                }
+                .buttonStyle(GraphiteIconButtonStyle())
+                .frame(width: 22, height: 22)
+                .accessibilityLabel("Clear search")
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Color.appForeground.opacity(0.06))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .frame(maxWidth: 220)
         }
-        .padding(.horizontal, 24)
-        .frame(height: 52)
+        .padding(.leading, 11)
+        .padding(.trailing, 6)
+        .frame(width: 220, height: 32)
+        .background(
+            isSearchFocused ? Graphite.fieldFocus : Graphite.fill,
+            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Graphite.ring, lineWidth: isSearchFocused ? 1 : 0)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { isSearchFocused = true }
     }
 
-    // MARK: - Empty State
+    // MARK: - History
 
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: searchText.isEmpty ? "waveform" : "magnifyingglass")
-                .font(.system(size: 36))
-                .foregroundStyle(Color.appForeground.opacity(0.25))
-            Text(searchText.isEmpty ? "No Dictations Yet" : "No Results")
-                .font(Font.appTitle3)
-                .fontWeight(.semibold)
-                .foregroundStyle(Color.appForeground)
-            Text(
-                searchText.isEmpty
-                ? "Your dictation history will appear here."
-                : "No dictations match \"\(searchText)\"."
-            )
-            .font(Font.appBody)
-            .foregroundStyle(Color.appForeground.opacity(0.45))
-            .multilineTextAlignment(.center)
+    @ViewBuilder
+    private var history: some View {
+        if entries.isEmpty {
+            EmptyState("No dictations yet") {
+                Text("Hold fn anywhere on your Mac. What you say shows up here.")
+            }
+        } else if filteredEntries.isEmpty {
+            EmptyState("Nothing matches “\(query)”") {
+                TextLink("Clear search") { searchText = "" }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(groupedByDay.enumerated()), id: \.element.day) { index, group in
+                    Text(dayTitle(group.day))
+                        .font(.inter(12.5, .semibold))
+                        .foregroundStyle(Graphite.text2)
+                        .padding(.top, index == 0 ? 0 : 36)
+                        .padding(.bottom, 6)
+                        .accessibilityAddTraits(.isHeader)
+                    HairlineStack(group.entries) { entry in
+                        entryRow(entry)
+                    }
+                }
+            }
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var groupedByDay: [(day: Date, entries: [DictationEntry])] {
+        let calendar = Calendar.current
+        var groups: [(day: Date, entries: [DictationEntry])] = []
+        for entry in filteredEntries {
+            let day = calendar.startOfDay(for: entry.timestamp)
+            if groups.last?.day == day {
+                groups[groups.count - 1].entries.append(entry)
+            } else {
+                groups.append((day, [entry]))
+            }
+        }
+        return groups
+    }
+
+    private func dayTitle(_ day: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(day) { return "Today" }
+        if calendar.isDateInYesterday(day) { return "Yesterday" }
+        return day.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+    }
+
+    // MARK: - Entry
+
+    private func styleName(for entry: DictationEntry) -> String? {
+        guard let styleId = entry.styleId else { return nil }
+        return styles.first { $0.id == styleId }?.name
+    }
+
+    private func displayedText(_ entry: DictationEntry) -> String {
+        if let processed = entry.processedText, !showingOriginal.contains(entry.id) { return processed }
+        return entry.rawText
+    }
+
+    private func entryRow(_ entry: DictationEntry) -> some View {
+        let isRewritten = entry.processedText != nil
+        let isOriginal = isRewritten && showingOriginal.contains(entry.id)
+        let styleName = styleName(for: entry)
+        let rewrittenVersion = styleName.map { "Show \($0) version" } ?? "Show rewritten version"
+
+        return HStack(alignment: .top, spacing: 20) {
+            VStack(alignment: .leading, spacing: 6) {
+                Button {
+                    copy(entry)
+                } label: {
+                    Text(highlighted(displayedText(entry)))
+                        .font(.inter(14.5))
+                        .lineSpacing(5.5)
+                        .foregroundStyle(isOriginal ? Graphite.text2 : Graphite.text)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: 560, alignment: .leading)
+                        .padding(.vertical, 2.5)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Click to copy")
+
+                if isRewritten {
+                    HStack(spacing: 6) {
+                        Text(isOriginal ? "Original transcript" : "Rewritten with \(styleName ?? "a style")")
+                        Text("·").accessibilityHidden(true)
+                        TextLink(isOriginal ? rewrittenVersion : "Show original", color: Graphite.text2) {
+                            toggleOriginal(entry)
+                        }
+                    }
+                    .font(.inter(12.5))
+                    .foregroundStyle(Graphite.text3)
+                    .padding(.top, 2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 4) {
+                Group {
+                    if copiedID == entry.id {
+                        Text("Copied").foregroundStyle(Graphite.accent)
+                    } else {
+                        Text(entry.timestamp, format: .dateTime.hour().minute())
+                            .monospacedDigit()
+                            .foregroundStyle(Graphite.text3)
+                    }
+                }
+                .font(.inter(12.5))
+                .frame(minWidth: 38, alignment: .trailing)
+
+                RowMenuButton("dictation from \(entry.timestamp.formatted(.dateTime.hour().minute()))") {
+                    entryMenuItems(entry, rewrittenVersion: rewrittenVersion)
+                }
+                .padding(.trailing, -6)
+            }
+            .frame(height: 23)
+        }
+        .listRowPadding()
+        .contentShape(Rectangle())
+        .contextMenu { entryMenuItems(entry, rewrittenVersion: rewrittenVersion) }
+    }
+
+    @ViewBuilder
+    private func entryMenuItems(_ entry: DictationEntry, rewrittenVersion: String) -> some View {
+        Button { copy(entry) } label: { Label("Copy", systemImage: "doc.on.doc") }
+        if entry.processedText != nil {
+            Button { toggleOriginal(entry) } label: {
+                Label(showingOriginal.contains(entry.id) ? rewrittenVersion : "Show original", systemImage: "arrow.left.arrow.right")
+            }
+        }
+        Divider()
+        Button(role: .destructive) { delete(entry) } label: { Label("Delete", systemImage: "trash") }
+    }
+
+    /// Search matches, marked in the text.
+    private func highlighted(_ text: String) -> AttributedString {
+        var attributed = AttributedString(text)
+        guard !query.isEmpty else { return attributed }
+        var searchRange = text.startIndex..<text.endIndex
+        while let match = text.range(of: query, options: [.caseInsensitive, .diacriticInsensitive], range: searchRange) {
+            if let lower = AttributedString.Index(match.lowerBound, within: attributed),
+               let upper = AttributedString.Index(match.upperBound, within: attributed) {
+                attributed[lower..<upper].backgroundColor = Graphite.searchMark
+            }
+            searchRange = match.upperBound..<text.endIndex
+        }
+        return attributed
+    }
+
+    // MARK: - Actions
+
+    private func copy(_ entry: DictationEntry) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(displayedText(entry), forType: .string)
+        copiedID = entry.id
+        copyResetTask?.cancel()
+        copyResetTask = Task {
+            try? await Task.sleep(for: .seconds(1.4))
+            guard !Task.isCancelled else { return }
+            copiedID = nil
+        }
+    }
+
+    private func toggleOriginal(_ entry: DictationEntry) {
+        if showingOriginal.contains(entry.id) {
+            showingOriginal.remove(entry.id)
+        } else {
+            showingOriginal.insert(entry.id)
+        }
+    }
+
+    private func delete(_ entry: DictationEntry) {
+        let deleted = DeletedEntry(entry)
+        modelContext.delete(entry)
+        try? modelContext.save()
+        let context = modelContext
+        dashboard.showToast(Text("Dictation deleted")) {
+            deleted.restore(in: context)
+        }
     }
 
     // MARK: - Diagnostic Log
@@ -107,36 +294,31 @@ struct HomeView: View {
     #if DEBUG
     private var diagnosticPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
+            Rectangle().fill(Graphite.hairline).frame(height: 1)
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) { showDiagnostics.toggle() }
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "waveform.badge.magnifyingglass")
-                        .font(.caption)
                     Text("Pipeline Log")
-                        .font(.caption)
                     if !PipelineEventLog.shared.events.isEmpty {
                         Text("\(PipelineEventLog.shared.events.count)")
-                            .font(.caption2)
                             .monospacedDigit()
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
-                            .background(.tint.opacity(0.15), in: Capsule())
-                            .foregroundStyle(.tint)
+                            .background(Graphite.fill, in: Capsule())
                     }
                     Spacer()
                     if !PipelineEventLog.shared.events.isEmpty {
                         Button("Clear") { PipelineEventLog.shared.clear() }
-                            .font(.caption)
-                            .buttonStyle(.borderless)
-                            .foregroundStyle(.secondary)
+                            .buttonStyle(.plain)
                     }
-                    Image(systemName: showDiagnostics ? "chevron.up" : "chevron.down")
-                        .font(.caption)
+                    Image(systemName: showDiagnostics ? "chevron.down" : "chevron.up")
                 }
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 6)
+                .font(.inter(12))
+                .foregroundStyle(Graphite.text3)
+                .padding(.horizontal, 44)
+                .padding(.vertical, 8)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -144,10 +326,10 @@ struct HomeView: View {
             if showDiagnostics {
                 if PipelineEventLog.shared.events.isEmpty {
                     Text("No events yet. Make a recording to see pipeline activity.")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 8)
+                        .font(.inter(12))
+                        .foregroundStyle(Graphite.text3)
+                        .padding(.horizontal, 44)
+                        .padding(.bottom, 10)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     ScrollView {
@@ -155,218 +337,60 @@ struct HomeView: View {
                             ForEach(PipelineEventLog.shared.events) { event in
                                 HStack(alignment: .top, spacing: 8) {
                                     Text(event.timestamp.formatted(.dateTime.hour().minute().second()))
-                                        .font(.system(.caption2, design: .monospaced))
-                                        .foregroundStyle(.tertiary)
+                                        .foregroundStyle(Graphite.text3)
                                         .frame(width: 72, alignment: .leading)
                                     Text(event.message)
-                                        .font(.system(.caption, design: .monospaced))
                                         .foregroundStyle(colorFor(event.kind))
                                         .textSelection(.enabled)
                                     Spacer()
                                 }
+                                .font(.graphiteMono(11))
                             }
                         }
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, 44)
                         .padding(.vertical, 6)
                     }
                     .frame(maxHeight: 180)
-                    .background(Color(.windowBackgroundColor).opacity(0.5))
                 }
             }
         }
+        .background(Graphite.sidebar)
     }
 
     private func colorFor(_ kind: PipelineEvent.Kind) -> Color {
         switch kind {
-        case .info: return .primary
+        case .info: return Graphite.text2
         case .success: return .green
-        case .error: return .red
+        case .error: return Graphite.accent
         }
     }
     #endif
-
-    // MARK: - Entry List
-
-    private var entryList: some View {
-        ScrollView {
-            LazyVStack(spacing: 10) {
-                ForEach(filteredEntries) { entry in
-                    DictationEntryRow(entry: entry)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-        }
-        .background(Color.appBackground)
-    }
 }
 
-// MARK: - Dictation Entry Row
+/// What a deleted dictation needs to come back with Undo.
+private struct DeletedEntry {
+    let id: UUID
+    let timestamp: Date
+    let rawText: String
+    let processedText: String?
+    let styleId: UUID?
+    let audioFilePath: String?
 
-private struct DictationEntryRow: View {
-    let entry: DictationEntry
-    @State private var showingRaw: Bool = false
-    @State private var copied: Bool = false
-    @State private var isHovered: Bool = false
-    @State private var isWandHovered = false
-    @State private var isRawHovered = false
-    @State private var isTrashHovered = false
-    @Environment(\.modelContext) private var modelContext
-
-    private let sideWidth: CGFloat = 120
-
-    private var displayedText: String {
-        showingRaw ? entry.rawText : (entry.processedText ?? entry.rawText)
+    init(_ entry: DictationEntry) {
+        id = entry.id
+        timestamp = entry.timestamp
+        rawText = entry.rawText
+        processedText = entry.processedText
+        styleId = entry.styleId
+        audioFilePath = entry.audioFilePath
     }
 
-    private var hasProcessed: Bool {
-        entry.processedText != nil
-    }
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            // Left: date and time, one line, right-aligned
-            HStack(spacing: 4) {
-                Text(entry.timestamp, format: .dateTime.month(.abbreviated).day())
-                Text(entry.timestamp, format: .dateTime.hour().minute())
-            }
-            .font(.caption)
-            .foregroundStyle(Color.appForeground.opacity(0.45))
-            .lineLimit(1)
-            .frame(width: sideWidth, alignment: .trailing)
-
-            // Center: the card
-            card.frame(maxWidth: 500)
-
-            // Right: "Copied" indicator, symmetric width to keep card centered
-            ZStack(alignment: .leading) {
-                if copied {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.caption)
-                        Text("Copied")
-                            .font(.caption2)
-                    }
-                    .foregroundStyle(Color.appError)
-                    .transition(.opacity)
-                }
-            }
-            .frame(width: sideWidth, alignment: .leading)
-        }
-    }
-
-    private var card: some View {
-        HStack(spacing: 0) {
-            // Text area — clicking copies
-            Button(action: copyText) {
-                Text(displayedText)
-                    .font(.body)
-                    .foregroundStyle(Color.appForeground)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(12)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            // Vertical divider
-            Rectangle()
-                .fill(Color.appForeground.opacity(0.12))
-                .frame(width: 1)
-                .padding(.vertical, 8)
-
-            // Icon controls
-            VStack(spacing: 0) {
-                // Processed / wand
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) { showingRaw = false }
-                } label: {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 15, weight: .regular))
-                        .foregroundStyle(!showingRaw && hasProcessed || isWandHovered
-                            ? Color.appError
-                            : Color.appForeground.opacity(0.35))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .onHover { isWandHovered = $0 }
-                .help("Show Processed Text")
-
-                Rectangle()
-                    .fill(Color.appForeground.opacity(0.12))
-                    .frame(height: 1)
-                    .padding(.horizontal, 8)
-
-                // Raw / original text
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) { showingRaw = true }
-                } label: {
-                    Image(systemName: "doc.text")
-                        .font(.system(size: 15, weight: .regular))
-                        .foregroundStyle(showingRaw || !hasProcessed || isRawHovered
-                            ? Color.appError
-                            : Color.appForeground.opacity(0.35))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .onHover { isRawHovered = $0 }
-                .help("Show Original Text")
-
-                Rectangle()
-                    .fill(Color.appForeground.opacity(0.12))
-                    .frame(height: 1)
-                    .padding(.horizontal, 8)
-
-                // Delete
-                Button(action: deleteEntry) {
-                    Image(systemName: "minus.circle")
-                        .font(.system(size: 15, weight: .regular))
-                        .foregroundStyle(isTrashHovered ? Color.appError : Color.appForeground.opacity(0.35))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .onHover { isTrashHovered = $0 }
-                .help("Delete Entry")
-            }
-            .frame(width: 56)
-            .padding(.vertical, 8)
-        }
-        .frame(minHeight: 122)
-        .background(
-            isHovered
-                ? Color.appForeground.opacity(0.07)
-                : Color.appForeground.opacity(0.03)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(
-                    isHovered
-                        ? Color.appForeground.opacity(0.25)
-                        : Color.appForeground.opacity(0.12),
-                    lineWidth: 1
-                )
-        )
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovered = hovering
-            }
-        }
-    }
-
-    private func copyText() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(displayedText, forType: .string)
-        withAnimation(.easeInOut(duration: 0.15)) { copied = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation(.easeInOut(duration: 0.3)) { copied = false }
-        }
-    }
-
-    private func deleteEntry() {
-        modelContext.delete(entry)
+    @MainActor
+    func restore(in context: ModelContext) {
+        let entry = DictationEntry(rawText: rawText, processedText: processedText, styleId: styleId, audioFilePath: audioFilePath)
+        entry.id = id
+        entry.timestamp = timestamp
+        context.insert(entry)
+        try? context.save()
     }
 }

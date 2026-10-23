@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.applicationIconImage = makeAppIcon()
+        Graphite.registerFonts()
 
         // Request microphone access early so the system dialog appears immediately
         // rather than silently capturing silence the first time the user records.
@@ -38,9 +39,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .environment(permissionManager)
                 .modelContainer(container)
 
+            // Graphite: one dark surface edge to edge, with the traffic lights over the sidebar.
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 800, height: 550),
-                styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                 backing: .buffered,
                 defer: false
             )
@@ -49,6 +51,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.isReleasedWhenClosed = false
             window.minSize = NSSize(width: 700, height: 500)
             window.title = "Shh.."
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.appearance = NSAppearance(named: .darkAqua)
+            window.backgroundColor = Graphite.windowBackground
             dashboardWindow = window
         }
 

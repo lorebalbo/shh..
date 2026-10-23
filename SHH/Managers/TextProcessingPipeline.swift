@@ -55,6 +55,7 @@ final class TextProcessingPipeline {
         switch activeProvider.providerType {
         case .openAI:    resolvedURL = activeProvider.endpointURL.isEmpty ? "https://api.openai.com" : activeProvider.endpointURL
         case .local:     resolvedURL = activeProvider.endpointURL
+        case .anthropic: resolvedURL = activeProvider.endpointURL.isEmpty ? "https://api.anthropic.com" : activeProvider.endpointURL
         }
         PipelineEventLog.shared.append("🧠 Style \"\(activeStyle.name)\" | model: \(activeProvider.modelName) | endpoint: \(resolvedURL)", kind: .info)
 
@@ -100,6 +101,12 @@ final class TextProcessingPipeline {
         case .local:
             return LLMClient(
                 baseURL: config.endpointURL,
+                apiKey: config.apiKey,
+                modelName: config.modelName
+            )
+        case .anthropic:
+            return AnthropicAdapter(
+                baseURL: config.endpointURL.isEmpty ? "https://api.anthropic.com" : config.endpointURL,
                 apiKey: config.apiKey,
                 modelName: config.modelName
             )

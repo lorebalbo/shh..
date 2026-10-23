@@ -124,6 +124,9 @@ final class ModelManager: @unchecked Sendable {
 
     static let bundledModelName = "ggml-base.bin"
 
+    /// Bundled Silero VAD model used by the native whisper.cpp VAD runtime.
+    static let bundledVADModelName = "ggml-silero-v5.1.2.bin"
+
     private static let activeModelIdKey = "activeWhisperModelId"
 
     private let userModelsDirectoryName = "models"
@@ -134,6 +137,17 @@ final class ModelManager: @unchecked Sendable {
 
     /// Per-model download states, keyed by KnownWhisperModel.id.
     private(set) var downloadStates: [String: ModelDownloadState] = [:]
+
+    /// The model to switch to once its download finishes ("Download and use").
+    private(set) var pendingActivationId: String?
+
+    /// Only one model downloads at a time.
+    var isDownloading: Bool {
+        downloadStates.values.contains { state in
+            if case .downloading = state { return true }
+            return false
+        }
+    }
 
     private var downloadTasks: [String: URLSessionDownloadTask] = [:]
     private var downloadObservations: [String: NSKeyValueObservation] = [:]
@@ -175,6 +189,11 @@ final class ModelManager: @unchecked Sendable {
     /// Returns the path to the bundled base model, or nil if missing.
     func bundledModelPath() -> String? {
         Bundle.main.path(forResource: "ggml-base", ofType: "bin")
+    }
+
+    /// Returns the path to the bundled Silero VAD model, or nil if missing.
+    func resolveVADModelPath() -> String? {
+        Bundle.main.path(forResource: "ggml-silero-v5.1.2", ofType: "bin")
     }
 
     /// Returns the file-system path for the active model, falling back to the
@@ -230,31 +249,59 @@ final class ModelManager: @unchecked Sendable {
     }
 
     /// Initiates a download for the given model. No-op if already downloaded or in progress.
-    func downloadModel(_ model: KnownWhisperModel) {
+    /// With `activateOnCompletion`, the model becomes active once it's on disk.
+    func downloadModel(_ model: KnownWhisperModel, activateOnCompletion: Bool = false) {
         switch downloadStates[model.id] ?? .notDownloaded {
         case .downloaded, .downloading(_): return
-        case .notDownloaded, .failed(_): startDownload(model)
+        case .notDownloaded, .failed(_):
+            pendingActivationId = activateOnCompletion ? model.id : nil
+            startDownload(model)
         }
+    }
+
+    /// Sets (or clears, with nil) the model to activate when its in-progress download finishes.
+    func activateWhenDownloaded(_ model: KnownWhisperModel?) {
+        pendingActivationId = model?.id
     }
 
     /// Cancels an in-progress download and resets the model state to notDownloaded.
     func cancelDownload(_ model: KnownWhisperModel) {
         downloadTasks[model.id]?.cancel()
         cleanupDownloadTracking(modelId: model.id)
+        if pendingActivationId == model.id { pendingActivationId = nil }
         DispatchQueue.main.async { self.downloadStates[model.id] = .notDownloaded }
     }
 
+    /// Deletes a downloaded model from disk. Deleting the active model falls
+    /// back to the bundled base model. The bundled base model can't be deleted.
+    func deleteModel(_ model: KnownWhisperModel) throws {
+        guard model.id != "base" else { throw ModelError.cannotDeleteBundledModel }
+        let path = userModelsDirectory.appendingPathComponent(model.fileName)
+        if FileManager.default.fileExists(atPath: path.path) {
+            try FileManager.default.removeItem(at: path)
+        }
+        downloadStates[model.id] = .notDownloaded
+        if activeModelId == model.id {
+            activeModelId = "base"
+            UserDefaults.standard.set("base", forKey: Self.activeModelIdKey)
+        }
+    }
+
+    /// Called on the main thread, like the rest of the UI-facing API.
     private func startDownload(_ model: KnownWhisperModel) {
         try? ensureUserModelsDirectoryExists()
-        DispatchQueue.main.async { self.downloadStates[model.id] = .downloading(progress: 0) }
+        downloadStates[model.id] = .downloading(progress: 0)
 
         let task = URLSession.shared.downloadTask(with: model.downloadURL) { [weak self] tempURL, _, error in
             guard let self else { return }
 
             if let error {
+                // A cancelled task reports NSURLErrorCancelled; cancelDownload already reset its state.
+                if (error as? URLError)?.code == .cancelled { return }
                 DispatchQueue.main.async {
                     self.downloadStates[model.id] = .failed(message: error.localizedDescription)
                     self.cleanupDownloadTracking(modelId: model.id)
+                    if self.pendingActivationId == model.id { self.pendingActivationId = nil }
                 }
                 return
             }
@@ -263,6 +310,7 @@ final class ModelManager: @unchecked Sendable {
                 DispatchQueue.main.async {
                     self.downloadStates[model.id] = .failed(message: "No file received from server")
                     self.cleanupDownloadTracking(modelId: model.id)
+                    if self.pendingActivationId == model.id { self.pendingActivationId = nil }
                 }
                 return
             }
@@ -277,7 +325,8 @@ final class ModelManager: @unchecked Sendable {
                 DispatchQueue.main.async {
                     self.downloadStates[model.id] = .downloaded
                     self.cleanupDownloadTracking(modelId: model.id)
-                    if model.isMostPowerful {
+                    if self.pendingActivationId == model.id {
+                        self.pendingActivationId = nil
                         self.setActiveModel(model)
                     }
                 }
@@ -285,13 +334,17 @@ final class ModelManager: @unchecked Sendable {
                 DispatchQueue.main.async {
                     self.downloadStates[model.id] = .failed(message: error.localizedDescription)
                     self.cleanupDownloadTracking(modelId: model.id)
+                    if self.pendingActivationId == model.id { self.pendingActivationId = nil }
                 }
             }
         }
 
         let observation = task.progress.observe(\.fractionCompleted) { [weak self] progress, _ in
+            let fraction = progress.fractionCompleted
             DispatchQueue.main.async {
-                self?.downloadStates[model.id] = .downloading(progress: progress.fractionCompleted)
+                // Ignore progress that lands after the download finished or was cancelled.
+                guard let self, case .downloading = self.downloadStates[model.id] else { return }
+                self.downloadStates[model.id] = .downloading(progress: fraction)
             }
         }
 

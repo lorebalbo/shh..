@@ -1,18 +1,23 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct DashboardView: View {
     @Environment(PermissionManager.self) private var permissionManager
+    @State private var dashboard = DashboardModel()
 
     var body: some View {
         Group {
             if permissionManager.allPermissionsGranted {
-                DashboardContentView()
+                DashboardShell()
             } else {
                 PermissionDeniedView()
             }
         }
+        .environment(dashboard)
+        .environment(\.colorScheme, .dark)
         .frame(minWidth: 700, minHeight: 500)
+        .background(Graphite.background)
+        .ignoresSafeArea()
         .onReceive(
             NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
         ) { _ in
@@ -21,416 +26,265 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - Sidebar Navigation
+// MARK: - Navigation
 
-enum SidebarSection: String, CaseIterable, Identifiable {
+enum DashboardPage: String, CaseIterable, Identifiable {
     case home
-    case style
-    case llmProviders
-    case whisper
+    case styles
+    case speech
+    case providers
     case settings
     case help
 
     var id: String { rawValue }
 
-    var label: String {
+    var title: String {
         switch self {
         case .home: "Home"
-        case .style: "Style"
-        case .llmProviders: "Providers"
-        case .whisper: "Whisper"
+        case .styles: "Styles"
+        case .speech: "Speech models"
+        case .providers: "Providers"
         case .settings: "Settings"
         case .help: "Help"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .home: "Hold fn to dictate. Release, and it's on your clipboard."
+        case .styles: "A style rewrites what you said before it's copied. Pick one, or none."
+        case .speech: "Speech becomes text on this Mac and is never uploaded. Larger models are more accurate, but slower."
+        case .providers: "When a style is on, the active provider does the rewriting. One at a time."
+        case .settings: "How Shh.. starts, listens and what it keeps."
+        case .help: "The basics and every shortcut."
         }
     }
 
     var icon: String {
         switch self {
         case .home: "house"
-        case .style: "paintbrush"
-        case .llmProviders: "brain"
-        case .whisper: "cpu"
+        case .styles: "paintbrush"
+        case .speech: "waveform"
+        case .providers: "powerplug"
         case .settings: "gearshape"
         case .help: "questionmark.circle"
         }
     }
 }
 
-private struct DashboardContentView: View {
-    @State private var selectedSection: SidebarSection? = .home
-    @AppStorage("sidebarCollapsed") private var sidebarCollapsed = false
+/// Dashboard-wide UI state: the open page, the toast, and requests that cross pages
+/// (⌘F focuses Home's search, ⌘N opens the Styles editor).
+@Observable
+@MainActor
+final class DashboardModel {
+    var page: DashboardPage = .home
+    var wantsSearchFocus = false
+    var wantsNewStyle = false
+    private(set) var toast: Toast?
+    private var toastTask: Task<Void, Never>?
+
+    struct Toast: Identifiable {
+        let id = UUID()
+        let message: Text
+        let undo: (@MainActor () -> Void)?
+    }
+
+    func focusSearch() {
+        page = .home
+        wantsSearchFocus = true
+    }
+
+    func newStyle() {
+        page = .styles
+        wantsNewStyle = true
+    }
+
+    /// Shows a short message at the bottom of the window. With `undo` it also offers
+    /// Undo, and stays a little longer.
+    func showToast(_ message: Text, undo: (@MainActor () -> Void)? = nil) {
+        let toast = Toast(message: message, undo: undo)
+        let id = toast.id
+        withAnimation(.easeOut(duration: 0.18)) { self.toast = toast }
+        toastTask?.cancel()
+        toastTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(undo == nil ? 3.5 : 5))
+            guard !Task.isCancelled else { return }
+            self?.dismissToast(id)
+        }
+    }
+
+    func undoToast() {
+        guard let toast, let undo = toast.undo else { return }
+        dismissToast(toast.id)
+        undo()
+    }
+
+    private func dismissToast(_ id: UUID) {
+        guard toast?.id == id else { return }
+        withAnimation(.easeOut(duration: 0.18)) { toast = nil }
+    }
+}
+
+// MARK: - Shell
+
+struct DashboardShell: View {
+    @Environment(DashboardModel.self) private var dashboard
     @AppStorage("hasCompletedSetup") private var hasCompletedSetup = false
-    @State private var showOnboarding = false
 
     var body: some View {
         HStack(spacing: 0) {
-            SidebarView(selection: $selectedSection, collapsed: $sidebarCollapsed)
-
-            Rectangle()
-                .fill(Color.appForeground.opacity(0.12))
-                .frame(width: 1)
-
-            detailView
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .frame(minWidth: 400)
-                .background(Color.appBackground)
-        }
-        .background(Color.appBackground)
-        .onAppear {
-            if !hasCompletedSetup {
-                showOnboarding = true
+            Sidebar()
+            ZStack(alignment: .bottom) {
+                currentPage
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ToastHost()
             }
+            .background(Graphite.background)
         }
-        .sheet(isPresented: $showOnboarding) {
-            OnboardingSheet(
-                onGoToSettings: {
-                    showOnboarding = false
-                    hasCompletedSetup = true
-                    selectedSection = .llmProviders
-                },
-                onGoToStyles: {
-                    showOnboarding = false
-                    hasCompletedSetup = true
-                    selectedSection = .style
-                },
-                onDismiss: {
-                    showOnboarding = false
-                    hasCompletedSetup = true
-                }
-            )
+        .background { shortcuts }
+        .onAppear {
+            // First run opens on Help's "Getting started" instead of an empty history.
+            if !hasCompletedSetup {
+                hasCompletedSetup = true
+                dashboard.page = .help
+            }
         }
     }
 
     @ViewBuilder
-    private var detailView: some View {
-        switch selectedSection {
-        case .home:
-            HomeView()
-        case .style:
-            StyleView()
-        case .llmProviders:
-            LLMProvidersView()
-        case .whisper:
-            WhisperModelsView()
-        case .settings:
-            SettingsView()
-        case .help:
-            HelpView()
-        case nil:
-            HomeView()
+    private var currentPage: some View {
+        switch dashboard.page {
+        case .home: HomeView()
+        case .styles: StylesView()
+        case .speech: SpeechModelsView()
+        case .providers: LLMProvidersView()
+        case .settings: SettingsView()
+        case .help: HelpView()
         }
+    }
+
+    /// Window-wide shortcuts, carried by invisible buttons.
+    private var shortcuts: some View {
+        ZStack {
+            Button("Search dictations") { dashboard.focusSearch() }
+                .keyboardShortcut("f", modifiers: .command)
+            Button("New style") { dashboard.newStyle() }
+                .keyboardShortcut("n", modifiers: .command)
+        }
+        .opacity(0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
-private struct SidebarView: View {
-    @Binding var selection: SidebarSection?
-    @Binding var collapsed: Bool
+// MARK: - Sidebar
+
+private struct Sidebar: View {
+    @Environment(DashboardModel.self) private var dashboard
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Header: Logo & Title + Collapse Toggle
-            HStack(alignment: .center, spacing: 0) {
-                if !collapsed {
-                    Button {
-                        selection = .home
-                    } label: {
-                        Text("Shh...")
-                            .font(Font.appHeadline)
-                            .fontWeight(.semibold)
-                            .fixedSize()
-                            .alignmentGuide(VerticalAlignment.center) { d in
-                                d[.firstTextBaseline] / 2
-                            }
-                            .padding(.leading, 20)
-                            .foregroundStyle(Color.appForeground)
-                    }
-                    .buttonStyle(.plain)
-                    .transition(.opacity)
-                }
-
-                Spacer(minLength: 0)
-
-                Button {
-                    withAnimation(.spring(duration: 0.3)) {
-                        collapsed.toggle()
-                    }
-                } label: {
-                    Image(systemName: collapsed ? "sidebar.right" : "sidebar.left")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Color.appForeground.opacity(0.8))
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .padding(.trailing, 10)
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                dashboard.page = .home
+            } label: {
+                Text("Shh..")
+                    .font(.inter(15, .semibold))
+                    .tracking(-0.3)
+                    .foregroundStyle(Graphite.text)
             }
-            .frame(height: 52)
+            .buttonStyle(.plain)
+            .padding(.leading, 10)
+            .padding(.top, 46)
 
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach([SidebarSection.home, SidebarSection.style, SidebarSection.llmProviders, SidebarSection.whisper]) { section in
-                    SidebarRow(section: section, isSelected: selection == section, isCollapsed: collapsed) {
-                        selection = section
-                    }
-                }
+            VStack(spacing: 2) {
+                NavRow(page: .home)
+                NavRow(page: .styles)
+                Spacer().frame(height: 16)
+                NavRow(page: .speech)
+                NavRow(page: .providers)
             }
-            .padding(.horizontal, 10)
+            .padding(.top, 20)
 
-            Spacer()
+            Spacer(minLength: 16)
 
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach([SidebarSection.settings, SidebarSection.help]) { section in
-                    SidebarRow(section: section, isSelected: selection == section, isCollapsed: collapsed) {
-                        selection = section
-                    }
-                }
+            VStack(spacing: 2) {
+                NavRow(page: .settings)
+                NavRow(page: .help)
             }
-            .padding(.horizontal, 10)
-            .padding(.bottom, 16)
         }
-        .frame(width: collapsed ? 64 : 180)
-        .background(Color.appBackground)
+        .padding(.horizontal, 10)
+        .padding(.bottom, 14)
+        .frame(width: 188)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Graphite.sidebar)
     }
 }
 
-private struct SidebarRow: View {
-    let section: SidebarSection
-    let isSelected: Bool
-    let isCollapsed: Bool
-    let action: () -> Void
+private struct NavRow: View {
+    let page: DashboardPage
+    @Environment(DashboardModel.self) private var dashboard
     @State private var isHovered = false
 
     var body: some View {
-        Button(action: action) {
-            HStack(alignment: .center, spacing: 12) {
-                Image(systemName: section.icon)
+        let isSelected = dashboard.page == page
+        Button {
+            dashboard.page = page
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: page.icon)
                     .font(.system(size: 13))
-                    .frame(width: 20, height: 20, alignment: .center)
-
-                if !isCollapsed {
-                    Text(section.label)
-                        .font(.custom("League Spartan", size: 14))
-                        .lineLimit(1)
-                        .alignmentGuide(VerticalAlignment.center) { d in
-                            d[.firstTextBaseline] / 2
-                        }
-                        .transition(.opacity)
-                }
+                    .frame(width: 16)
+                    .foregroundStyle(isSelected ? Graphite.accent : isHovered ? Graphite.text2 : Graphite.text3)
+                Text(page.title)
+                    .font(.inter(13.5, isSelected ? .medium : .regular))
+                    .foregroundStyle(isSelected || isHovered ? Graphite.text : Graphite.text2)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
             }
-            .padding(.vertical, 6)
             .padding(.horizontal, 10)
-            .frame(width: isCollapsed ? 44 : 160, alignment: .leading)
-            .contentShape(Rectangle())
+            .frame(height: 32)
             .background(
-                isSelected
-                    ? Color.appForeground.opacity(0.15)
-                    : (isHovered ? Color.appForeground.opacity(0.08) : Color.clear)
+                isSelected ? Graphite.selected : isHovered ? Graphite.hover : .clear,
+                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
             )
-            .foregroundStyle(
-                isSelected
-                    ? Color.appError
-                    : (isHovered ? Color.appForeground : Color.appForeground.opacity(0.8))
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
-        .help(isCollapsed ? section.label : "")
+        .animation(.easeOut(duration: 0.12), value: isHovered)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
-// MARK: - Help View
+// MARK: - Toast
 
-struct HelpView: View {
-    var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    gettingStartedSection
-                    keyboardShortcutsSection
-                    aboutSection
-                }
-                .padding(24)
-            }
-        }
-        .background(Color.appBackground)
-    }
-
-    private var header: some View {
-        HStack {
-            Text("Help")
-                .font(Font.appHeadline)
-                .fontWeight(.bold)
-                .foregroundStyle(Color.appForeground)
-                .alignmentGuide(VerticalAlignment.center) { d in
-                    d[.firstTextBaseline] / 2
-                }
-            Spacer()
-        }
-        .padding(.horizontal, 24)
-        .frame(height: 52)
-    }
-
-    private var gettingStartedSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Getting Started", systemImage: "play.circle")
-                .font(Font.appHeadline)
-                .foregroundStyle(Color.appForeground)
-            VStack(alignment: .leading, spacing: 8) {
-                helpRow(icon: "mic", text: "Press the Fn key to start recording your voice.")
-                helpRow(icon: "doc.on.clipboard", text: "Transcribed text is automatically copied to your clipboard.")
-                helpRow(icon: "paintbrush", text: "Create Styles to transform your dictation with AI.")
-                helpRow(icon: "gearshape", text: "Configure an LLM provider in Settings to enable Styles.")
-            }
-        }
-        .padding(16)
-        .background(Color.appForeground.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.1), lineWidth: 1))
-    }
-
-    private var keyboardShortcutsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Keyboard Shortcuts", systemImage: "keyboard")
-                .font(Font.appHeadline)
-                .foregroundStyle(Color.appForeground)
-            VStack(alignment: .leading, spacing: 8) {
-                shortcutRow(key: "Fn", description: "Hold to record, release to transcribe")
-                shortcutRow(key: "Cmd+D", description: "Open Dashboard from menu bar")
-                shortcutRow(key: "Cmd+Q", description: "Quit Shh..")
-            }
-        }
-        .padding(16)
-        .background(Color.appForeground.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.1), lineWidth: 1))
-    }
-
-    private var aboutSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("About", systemImage: "info.circle")
-                .font(Font.appHeadline)
-                .foregroundStyle(Color.appForeground)
-            Text("Shh.. is a macOS voice utility that transcribes speech using on-device Whisper models and optionally processes text through AI styles.")
-                .font(Font.appBody)
-                .foregroundStyle(Color.appForeground.opacity(0.6))
-        }
-        .padding(16)
-        .background(Color.appForeground.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appForeground.opacity(0.1), lineWidth: 1))
-    }
-
-    private func helpRow(icon: String, text: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .frame(width: 20)
-                .foregroundStyle(Color.appError)
-            Text(text)
-                .font(Font.appBody)
-                .foregroundStyle(Color.appForeground)
-        }
-    }
-
-    private func shortcutRow(key: String, description: String) -> some View {
-        HStack(spacing: 12) {
-            Text(key)
-                .font(.custom("League Spartan", size: 15).monospaced())
-                .foregroundStyle(Color.appForeground)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.appForeground.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-            Text(description)
-                .font(Font.appBody)
-                .foregroundStyle(Color.appForeground.opacity(0.6))
-        }
-    }
-}
-
-// MARK: - Onboarding Sheet
-
-private struct OnboardingSheet: View {
-    let onGoToSettings: () -> Void
-    let onGoToStyles: () -> Void
-    let onDismiss: () -> Void
+private struct ToastHost: View {
+    @Environment(DashboardModel.self) private var dashboard
 
     var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "waveform")
-                .font(.custom("League Spartan", size: 42))
-                .foregroundStyle(.tint)
-
-            Text("Welcome to Shh..")
-                .font(Font.appTitle)
-                .fontWeight(.bold)
-
-            Text("Get started by setting up your voice utility in a few quick steps.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-
-            VStack(alignment: .leading, spacing: 16) {
-                onboardingStep(
-                    number: 1,
-                    title: "Configure an LLM Provider",
-                    description: "Add an API key for Anthropic, OpenAI, or set up a local endpoint to enable AI-powered text processing."
-                )
-
-                onboardingStep(
-                    number: 2,
-                    title: "Create a Style (Optional)",
-                    description: "Styles transform your dictated text using AI. Create one to reformat, translate, or summarize your speech."
-                )
-
-                onboardingStep(
-                    number: 3,
-                    title: "Start Dictating",
-                    description: "Press the Fn key to record. Your text will be transcribed and optionally processed."
-                )
-            }
-            .padding(.vertical, 8)
-
-            VStack(spacing: 8) {
-                Button(action: onGoToSettings) {
-                    Text("Go to Settings")
-                        .frame(maxWidth: .infinity)
+        if let toast = dashboard.toast {
+            HStack(spacing: 10) {
+                toast.message
+                    .font(.inter(14))
+                    .foregroundStyle(Graphite.text)
+                if toast.undo != nil {
+                    Button("Undo") { dashboard.undoToast() }
+                        .buttonStyle(.graphite(.plain))
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-
-                Button(action: onGoToStyles) {
-                    Text("Create a Style")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-
-                Button("Skip for Now", action: onDismiss)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 4)
             }
-        }
-        .padding(32)
-        .frame(width: 420)
-    }
-
-    private func onboardingStep(number: Int, title: String, description: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Text("\(number)")
-                .font(Font.appCaption)
-                .fontWeight(.bold)
-                .foregroundStyle(.white)
-                .frame(width: 24, height: 24)
-                .background(.tint)
-                .clipShape(Circle())
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .fontWeight(.medium)
-                Text(description)
-                    .font(Font.appCaption)
-                    .foregroundStyle(.secondary)
+            .padding(.leading, 14)
+            .padding(.trailing, toast.undo == nil ? 14 : 6)
+            .padding(.vertical, toast.undo == nil ? 9 : 6)
+            .background(Graphite.raised, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.07), lineWidth: 1)
             }
+            .shadow(color: .black.opacity(0.5), radius: 18, y: 14)
+            .padding(.bottom, 22)
+            .id(toast.id)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .accessibilityElement(children: .contain)
         }
     }
 }

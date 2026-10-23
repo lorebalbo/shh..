@@ -4,6 +4,7 @@ import SwiftData
 enum LLMProviderType: String, Codable {
     case openAI
     case local
+    case anthropic
 }
 
 @Model
