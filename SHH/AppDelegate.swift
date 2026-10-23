@@ -155,21 +155,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             bgColor.setFill()
             NSBezierPath(roundedRect: iconRect, xRadius: cornerRadius, yRadius: cornerRadius).fill()
 
-            let config = NSImage.SymbolConfiguration(paletteColors: [fgColor])
-            guard let symbol = NSImage(systemSymbolName: "waveform", accessibilityDescription: nil)?
-                .withSymbolConfiguration(config) else { return true }
+            guard let mark = NSImage(named: "AppMark"),
+                  let context = NSGraphicsContext.current?.cgContext else { return true }
 
-            // Waveform at 50% of the icon shape height (slightly larger & more prominent).
-            let targetHeight = iconRect.height * 0.50
-            let scale = targetHeight / symbol.size.height
-            let scaledWidth = symbol.size.width * scale
+            // Mark at 56% of the icon shape height, matching scripts/generate-icon.swift.
+            let targetHeight = iconRect.height * 0.56
+            let scaledWidth = mark.size.width * targetHeight / mark.size.height
             let drawRect = NSRect(
                 x: iconRect.midX - scaledWidth / 2,
                 y: iconRect.midY - targetHeight / 2,
                 width: scaledWidth,
                 height: targetHeight
             )
-            symbol.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1.0)
+            // Tint cream: draw the mark's alpha, then paint the colour through it.
+            context.beginTransparencyLayer(auxiliaryInfo: nil)
+            mark.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1.0)
+            fgColor.setFill()
+            drawRect.fill(using: .sourceIn)
+            context.endTransparencyLayer()
             return true
         }
     }
