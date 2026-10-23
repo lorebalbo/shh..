@@ -126,6 +126,21 @@ final class ClipboardManager {
         }
     }
 
+    /// Like `autoPaste(text:)`, but first waits (until `deadline` at most) for the user
+    /// to let go of ⌃, ⌥ and ⇧, so the shortcut that asked for the paste can't leak
+    /// into the simulated Cmd+V.
+    func autoPasteWhenModifiersReleased(text: String, deadline: Date = Date().addingTimeInterval(1)) {
+        let held = CGEventSource.flagsState(.hidSystemState)
+            .intersection([.maskControl, .maskAlternate, .maskShift])
+        guard held.isEmpty || Date() >= deadline else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(20)) { [weak self] in
+                self?.autoPasteWhenModifiersReleased(text: text, deadline: deadline)
+            }
+            return
+        }
+        autoPaste(text: text)
+    }
+
     // MARK: - CGEvent Paste Simulation
 
     /// Creates and posts CGEvent key-down and key-up events for 'V' (virtual

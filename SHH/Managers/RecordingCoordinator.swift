@@ -85,6 +85,21 @@ final class RecordingCoordinator {
         stateMachine.startLockIn()
     }
 
+    /// Pastes the most recent dictation into the focused app — the style's rewrite
+    /// if one was applied. Returns `false` when there is nothing to paste yet.
+    @discardableResult
+    func pasteLastTranscript() -> Bool {
+        guard let modelContext, let text = DictationEntry.lastPastableText(in: modelContext) else {
+            return false
+        }
+        PipelineEventLog.shared.append("📋 Pasting last transcript")
+        let clipboardManager = self.clipboardManager
+        DispatchQueue.main.async {
+            clipboardManager.autoPasteWhenModifiersReleased(text: text)
+        }
+        return true
+    }
+
     /// Stops recording regardless of the current mode.
     /// Uses the natural state-machine transitions so the transcription pipeline fires normally.
     func stopCurrentRecording() {
@@ -126,6 +141,9 @@ final class RecordingCoordinator {
         }
         inputManager.onEscPress = { [weak self] in
             self?.stateMachine.handleEscPress() ?? false
+        }
+        inputManager.onPasteLastPress = { [weak self] in
+            self?.pasteLastTranscript() ?? false
         }
 
         // Wire state machine → audio capture + transcription pipeline
@@ -222,7 +240,7 @@ final class RecordingCoordinator {
 
                 if rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     // No speech — still persist so user can play the audio back
-                    let result = TextProcessingResult(rawText: "(no speech detected)", processedText: nil, styleId: nil)
+                    let result = TextProcessingResult(rawText: DictationEntry.noSpeechText, processedText: nil, styleId: nil)
                     DispatchQueue.main.async { self.persistDictationEntry(result: result, audioFilePath: audioFilePath) }
                     return
                 }
@@ -252,7 +270,7 @@ final class RecordingCoordinator {
                 self?.logger.error("Transcription error: \(error.localizedDescription)")
                 PipelineEventLog.shared.append("❌ Transcription error: \(error.localizedDescription)", kind: .error)
                 if let self {
-                    let result = TextProcessingResult(rawText: "(transcription error)", processedText: nil, styleId: nil)
+                    let result = TextProcessingResult(rawText: DictationEntry.transcriptionErrorText, processedText: nil, styleId: nil)
                     DispatchQueue.main.async {
                         self.persistDictationEntry(result: result, audioFilePath: nil)
                         self.onError?(error)

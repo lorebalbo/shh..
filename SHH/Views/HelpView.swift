@@ -19,6 +19,7 @@ struct HelpView: View {
                 SettingsGroup("Keyboard shortcuts") {
                     shortcut("Record while held", keys: ["fn"], note: "hold", isFirst: true)
                     shortcut("Cancel recording", keys: ["esc"])
+                    shortcut("Paste the last transcript", keys: ["⌃", "⌥", "⌘", "V"])
                     shortcut("Open the dashboard from the menu bar", keys: ["⌘", "D"])
                     shortcut("Quit Shh..", keys: ["⌘", "Q"])
                 }
