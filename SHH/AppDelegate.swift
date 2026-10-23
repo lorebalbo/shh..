@@ -149,8 +149,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func makeAppIcon() -> NSImage {
         // 1024×1024 canvas per Apple HIG for macOS Big Sur+ icons.
         let canvasSize = CGSize(width: 1024, height: 1024)
-        let bgColor = NSColor(red: 233 / 255.0, green: 79 / 255.0, blue: 55 / 255.0, alpha: 1.0)
-        let fgColor = NSColor(red: 246 / 255.0, green: 247 / 255.0, blue: 235 / 255.0, alpha: 1.0)
+        // The app's Spice oranges: Graphite.accentHover, Graphite.accent, brand Spice.
+        let spice = [
+            NSColor(srgbRed: 244 / 255.0, green: 124 / 255.0, blue: 96 / 255.0, alpha: 1.0),
+            NSColor(srgbRed: 242 / 255.0, green: 106 / 255.0, blue: 75 / 255.0, alpha: 1.0),
+            NSColor(srgbRed: 233 / 255.0, green: 79 / 255.0, blue: 55 / 255.0, alpha: 1.0),
+        ]
+        let fgColor = NSColor(red: 30 / 255.0, green: 27 / 255.0, blue: 24 / 255.0, alpha: 1.0)
 
         return NSImage(size: canvasSize, flipped: false) { rect in
             // Apple icon grid: squircle inset ~100pt from each edge → 824×824 shape.
@@ -158,8 +163,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let iconRect = rect.insetBy(dx: iconInset, dy: iconInset)
             let cornerRadius: CGFloat = 185
 
-            bgColor.setFill()
-            NSBezierPath(roundedRect: iconRect, xRadius: cornerRadius, yRadius: cornerRadius).fill()
+            // Lit from far beyond the top-right corner: a radial gradient centred
+            // outside the shape, lit at the nearest corner, shaded at the farthest.
+            let light = NSPoint(x: iconRect.maxX + iconRect.width * 0.35, y: iconRect.maxY + iconRect.height * 0.35)
+            NSGraphicsContext.saveGraphicsState()
+            NSBezierPath(roundedRect: iconRect, xRadius: cornerRadius, yRadius: cornerRadius).addClip()
+            NSGradient(colors: spice, atLocations: [0, 0.5, 1], colorSpace: .sRGB)?.draw(
+                fromCenter: light, radius: hypot(light.x - iconRect.maxX, light.y - iconRect.maxY),
+                toCenter: light, radius: hypot(light.x - iconRect.minX, light.y - iconRect.minY),
+                options: [.drawsBeforeStartingLocation, .drawsAfterEndingLocation]
+            )
+            NSGraphicsContext.restoreGraphicsState()
 
             guard let mark = NSImage(named: "AppMark"),
                   let context = NSGraphicsContext.current?.cgContext else { return true }
@@ -173,7 +187,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 width: scaledWidth,
                 height: targetHeight
             )
-            // Tint cream: draw the mark's alpha, then paint the colour through it.
+            // Tint near-black: draw the mark's alpha, then paint the colour through it.
             context.beginTransparencyLayer(auxiliaryInfo: nil)
             mark.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1.0)
             fgColor.setFill()

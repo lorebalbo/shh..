@@ -55,7 +55,8 @@ let markHeightRatio: CGFloat = 0.56
 
 func makeIcon(pixels: Int) -> CGImage {
     let size = CGFloat(pixels)
-    let colorSpace = CGColorSpaceCreateDeviceRGB()
+    // sRGB so the PNGs carry the exact colours (DeviceRGB + generic CGColors came out lighter).
+    let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
     guard let ctx = CGContext(
         data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
         space: colorSpace,
@@ -68,12 +69,31 @@ func makeIcon(pixels: Int) -> CGImage {
     let iconRect = CGRect(x: inset, y: inset, width: size - inset * 2, height: size - inset * 2)
     let radius  = 185.0 * scale
 
-    // Background squircle (orange)
+    // Background squircle in the app's Spice oranges, lit from far beyond the top-right
+    // corner: a radial gradient centred outside the shape, from the lit corner
+    // (Graphite.accentHover) through Graphite.accent to the brand Spice at the farthest.
+    let light = CGPoint(x: iconRect.maxX + iconRect.width * 0.35, y: iconRect.maxY + iconRect.height * 0.35)
+    let gradient = CGGradient(
+        colorsSpace: colorSpace,
+        colors: [
+            CGColor(srgbRed: 244/255.0, green: 124/255.0, blue: 96/255.0, alpha: 1.0),
+            CGColor(srgbRed: 242/255.0, green: 106/255.0, blue: 75/255.0, alpha: 1.0),
+            CGColor(srgbRed: 233/255.0, green: 79/255.0, blue: 55/255.0, alpha: 1.0),
+        ] as CFArray,
+        locations: [0, 0.5, 1]
+    )!
+    ctx.saveGState()
     ctx.addPath(CGPath(roundedRect: iconRect, cornerWidth: radius, cornerHeight: radius, transform: nil))
-    ctx.setFillColor(CGColor(red: 233/255.0, green: 79/255.0, blue: 55/255.0, alpha: 1.0))
-    ctx.fillPath()
+    ctx.clip()
+    ctx.drawRadialGradient(
+        gradient,
+        startCenter: light, startRadius: hypot(light.x - iconRect.maxX, light.y - iconRect.maxY),
+        endCenter: light, endRadius: hypot(light.x - iconRect.minX, light.y - iconRect.minY),
+        options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+    )
+    ctx.restoreGState()
 
-    // Mark, tinted cream: draw its alpha, then paint the colour through it.
+    // Mark, tinted near-black: draw its alpha, then paint the colour through it.
     let markH = iconRect.height * markHeightRatio
     let markW = markH * CGFloat(markImage.width) / CGFloat(markImage.height)
     let markRect = CGRect(
@@ -85,7 +105,7 @@ func makeIcon(pixels: Int) -> CGImage {
     ctx.beginTransparencyLayer(auxiliaryInfo: nil)
     ctx.draw(markImage, in: markRect)
     ctx.setBlendMode(.sourceIn)
-    ctx.setFillColor(CGColor(red: 246/255.0, green: 247/255.0, blue: 235/255.0, alpha: 1.0))
+    ctx.setFillColor(CGColor(srgbRed: 30/255.0, green: 27/255.0, blue: 24/255.0, alpha: 1.0))
     ctx.fill(markRect)
     ctx.endTransparencyLayer()
 
