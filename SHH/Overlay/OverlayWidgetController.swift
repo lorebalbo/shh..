@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// Custom NSPanel subclass that never becomes key or main window,
@@ -53,12 +54,18 @@ final class OverlayPanel: NSPanel {
 /// Manages the always-on-top overlay widget displayed as a borderless,
 /// translucent NSPanel. The panel floats above all windows and never
 /// steals focus from the active application.
+///
+/// While recordings queue up, a click-through badge panel ("2 processing")
+/// sits against the widget: below it, or above it when the widget is on the
+/// bottom edge.
 /// Conforms to @unchecked Sendable because all mutations happen on the main thread.
 final class OverlayWidgetController: @unchecked Sendable {
 
     // MARK: - Constants
 
     static let widgetSize = CGSize(width: 88, height: 22)
+    static let badgeSize = CGSize(width: 88, height: 16)
+    private static let badgeGap: CGFloat = 3
 
     private enum UserDefaultsKey {
         static let positionX = "SHH_OverlayPositionX"
@@ -72,6 +79,14 @@ final class OverlayWidgetController: @unchecked Sendable {
     private let hostingView: NSHostingView<OverlayContentView>
     private let viewModel: OverlayViewModel
     private var screenObserver: NSObjectProtocol?
+
+    private let badgePanel: NSPanel
+    private var badgeCancellable: AnyCancellable?
+    private var moveObserver: NSObjectProtocol?
+
+    /// Called when the processing badge appears, disappears or moves, so panels
+    /// anchored to the widget (the style picker) can make room for it.
+    var onBadgeChanged: (() -> Void)?
 
     // MARK: - Init
 
@@ -106,12 +121,32 @@ final class OverlayWidgetController: @unchecked Sendable {
         hostingView.frame = contentRect
         panel.contentView = hostingView
 
+        badgePanel = NSPanel(
+            contentRect: NSRect(origin: .zero, size: Self.badgeSize),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        badgePanel.level = .floating
+        badgePanel.isOpaque = false
+        badgePanel.backgroundColor = .clear
+        badgePanel.hasShadow = false
+        badgePanel.ignoresMouseEvents = true
+        badgePanel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        badgePanel.hidesOnDeactivate = false
+        badgePanel.animationBehavior = .none
+        badgePanel.contentView = NSHostingView(rootView: ProcessingBadgeView(viewModel: viewModel))
+
         observeScreenChanges()
         setupDragHandling()
+        observeBadgeState()
     }
 
     deinit {
         if let observer = screenObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = moveObserver {
             NotificationCenter.default.removeObserver(observer)
         }
     }
@@ -122,10 +157,12 @@ final class OverlayWidgetController: @unchecked Sendable {
         let origin = restoredPosition()
         panel.setFrameOrigin(origin)
         panel.orderFrontRegardless()
+        updateBadge()
     }
 
     func hide() {
         panel.orderOut(nil)
+        updateBadge()
     }
 
     /// Updates the panel's position externally (e.g., after a drag).
@@ -142,6 +179,64 @@ final class OverlayWidgetController: @unchecked Sendable {
     /// Returns the panel reference for drag handling.
     var panelWindow: NSPanel {
         panel
+    }
+
+    /// The widget's frame, grown to include the processing badge when it shows.
+    /// Panels that sit against the widget use this so they don't cover the badge.
+    var anchorFrame: NSRect {
+        badgePanel.isVisible ? panel.frame.union(badgePanel.frame) : panel.frame
+    }
+
+    // MARK: - Processing Badge
+
+    private func observeBadgeState() {
+        badgeCancellable = Publishers.CombineLatest(viewModel.$processingCount, viewModel.$isRecording)
+            .map { OverlayViewModel.queueLabel(processingCount: $0, isRecording: $1) != nil }
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateBadge() }
+
+        // Follow the widget when it is dragged or snapped to an edge.
+        moveObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didMoveNotification,
+            object: panel,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self, self.badgePanel.isVisible else { return }
+            self.positionBadge()
+            self.onBadgeChanged?()
+        }
+    }
+
+    private func updateBadge() {
+        let wasVisible = badgePanel.isVisible
+        if panel.isVisible && viewModel.queueLabel != nil {
+            positionBadge()
+            badgePanel.orderFrontRegardless()
+        } else {
+            badgePanel.orderOut(nil)
+        }
+        if badgePanel.isVisible != wasVisible {
+            onBadgeChanged?()
+        }
+    }
+
+    private func positionBadge() {
+        let visibleFrame = (panel.screen ?? NSScreen.main)?.visibleFrame
+        badgePanel.setFrameOrigin(
+            Self.badgeOrigin(widgetFrame: panel.frame, badgeSize: Self.badgeSize, visibleFrame: visibleFrame)
+        )
+    }
+
+    /// Centres the badge just below the widget, or just above it when there is no
+    /// room below (the widget sits on the bottom edge, above the Dock).
+    static func badgeOrigin(widgetFrame: NSRect, badgeSize: CGSize, visibleFrame: NSRect?) -> NSPoint {
+        let x = widgetFrame.midX - badgeSize.width / 2
+        let belowY = widgetFrame.minY - badgeGap - badgeSize.height
+        if let visibleFrame, belowY < visibleFrame.minY {
+            return NSPoint(x: x, y: widgetFrame.maxY + badgeGap)
+        }
+        return NSPoint(x: x, y: belowY)
     }
 
     // MARK: - Drag Handling

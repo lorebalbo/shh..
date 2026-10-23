@@ -4,7 +4,8 @@
 /// Usage: swift generate-icon.swift <output-dir>
 /// The output directory should be SHH/Assets.xcassets/AppIcon.appiconset/
 ///
-/// Renders the exact same orange squircle + waveform icon as AppDelegate.makeAppIcon().
+/// Renders the exact same orange squircle + mark icon as AppDelegate.makeAppIcon().
+/// The mark is read from SHH/Assets.xcassets/AppMark.imageset/AppMark.png.
 import AppKit
 import CoreGraphics
 import ImageIO
@@ -17,6 +18,16 @@ guard CommandLine.arguments.count > 1 else {
     exit(1)
 }
 let outputDir = CommandLine.arguments[1]
+
+let markPath = URL(fileURLWithPath: #filePath).absoluteURL
+    .deletingLastPathComponent()
+    .appendingPathComponent("../SHH/Assets.xcassets/AppMark.imageset/AppMark.png")
+    .standardized.path
+guard let markSource = CGImageSourceCreateWithURL(URL(fileURLWithPath: markPath) as CFURL, nil),
+      let markImage = CGImageSourceCreateImageAtIndex(markSource, 0, nil) else {
+    fputs("Could not load the app mark at \(markPath)\n", stderr)
+    exit(1)
+}
 
 // MARK: - Icon sizes required by macOS app icon asset catalog
 
@@ -39,9 +50,13 @@ let sizes: [IconSize] = [
 
 // MARK: - Drawing
 
+/// Mark height as a fraction of the squircle's height.
+let markHeightRatio: CGFloat = 0.56
+
 func makeIcon(pixels: Int) -> CGImage {
     let size = CGFloat(pixels)
-    let colorSpace = CGColorSpaceCreateDeviceRGB()
+    // sRGB so the PNGs carry the exact colours (DeviceRGB + generic CGColors came out lighter).
+    let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
     guard let ctx = CGContext(
         data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
         space: colorSpace,
@@ -54,46 +69,45 @@ func makeIcon(pixels: Int) -> CGImage {
     let iconRect = CGRect(x: inset, y: inset, width: size - inset * 2, height: size - inset * 2)
     let radius  = 185.0 * scale
 
-    // Background squircle (orange)
+    // Background squircle in the app's Spice oranges, lit from far beyond the top-right
+    // corner: a radial gradient centred outside the shape, from the lit corner
+    // (Graphite.accentHover) through Graphite.accent to the brand Spice at the farthest.
+    let light = CGPoint(x: iconRect.maxX + iconRect.width * 0.35, y: iconRect.maxY + iconRect.height * 0.35)
+    let gradient = CGGradient(
+        colorsSpace: colorSpace,
+        colors: [
+            CGColor(srgbRed: 244/255.0, green: 124/255.0, blue: 96/255.0, alpha: 1.0),
+            CGColor(srgbRed: 242/255.0, green: 106/255.0, blue: 75/255.0, alpha: 1.0),
+            CGColor(srgbRed: 233/255.0, green: 79/255.0, blue: 55/255.0, alpha: 1.0),
+        ] as CFArray,
+        locations: [0, 0.5, 1]
+    )!
+    ctx.saveGState()
     ctx.addPath(CGPath(roundedRect: iconRect, cornerWidth: radius, cornerHeight: radius, transform: nil))
-    ctx.setFillColor(CGColor(red: 233/255.0, green: 79/255.0, blue: 55/255.0, alpha: 1.0))
-    ctx.fillPath()
+    ctx.clip()
+    ctx.drawRadialGradient(
+        gradient,
+        startCenter: light, startRadius: hypot(light.x - iconRect.maxX, light.y - iconRect.maxY),
+        endCenter: light, endRadius: hypot(light.x - iconRect.minX, light.y - iconRect.minY),
+        options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+    )
+    ctx.restoreGState()
 
-    // Waveform SF Symbol rasterised onto a scratch NSBitmapImageRep
-    let fgColor = NSColor(red: 246/255.0, green: 247/255.0, blue: 235/255.0, alpha: 1.0)
-    let symConfig = NSImage.SymbolConfiguration(paletteColors: [fgColor])
-    if let symImg = NSImage(systemSymbolName: "waveform", accessibilityDescription: nil)?
-        .withSymbolConfiguration(symConfig) {
-
-        let targetH = iconRect.height * 0.50
-        let symScale = targetH / symImg.size.height
-        let symW = symImg.size.width * symScale
-        let symRect = CGRect(
-            x: iconRect.midX - symW / 2,
-            y: iconRect.midY - targetH / 2,
-            width: symW, height: targetH
-        )
-
-        // Render the symbol into an offscreen bitmap, then composite into our CGContext
-        let symPixW = Int(ceil(symW))
-        let symPixH = Int(ceil(targetH))
-        if let bitmapRep = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: symPixW, pixelsHigh: symPixH,
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
-        ) {
-            NSGraphicsContext.saveGraphicsState()
-            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmapRep)
-            symImg.draw(in: NSRect(x: 0, y: 0, width: symW, height: targetH),
-                        from: .zero, operation: .sourceOver, fraction: 1.0)
-            NSGraphicsContext.restoreGraphicsState()
-
-            if let symCGImage = bitmapRep.cgImage {
-                ctx.draw(symCGImage, in: symRect)
-            }
-        }
-    }
+    // Mark, tinted white: draw its alpha, then paint the colour through it.
+    let markH = iconRect.height * markHeightRatio
+    let markW = markH * CGFloat(markImage.width) / CGFloat(markImage.height)
+    let markRect = CGRect(
+        x: iconRect.midX - markW / 2,
+        y: iconRect.midY - markH / 2,
+        width: markW, height: markH
+    )
+    ctx.interpolationQuality = .high
+    ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+    ctx.draw(markImage, in: markRect)
+    ctx.setBlendMode(.sourceIn)
+    ctx.setFillColor(CGColor(srgbRed: 1.0, green: 1.0, blue: 1.0, alpha: 1.0))
+    ctx.fill(markRect)
+    ctx.endTransparencyLayer()
 
     guard let result = ctx.makeImage() else { fatalError("Failed to create CGImage at \(pixels)px") }
     return result

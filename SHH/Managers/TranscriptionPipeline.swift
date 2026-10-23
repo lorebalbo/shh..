@@ -30,6 +30,8 @@ final class TranscriptionPipeline {
     private let modelManager: ModelManager
     private var transcriber: WhisperTranscriber?
     private var loadedModelPath: String?
+    private var vadProcessor: VADProcessor?
+    private var loadedVADModelPath: String?
 
     init(modelManager: ModelManager = .shared) {
         self.modelManager = modelManager
@@ -45,28 +47,38 @@ final class TranscriptionPipeline {
             return ""
         }
 
+        let normalized = TranscriptionEngine.normalize(audioBuffer)
+        let vad = resolveVAD()
+        if vad == nil {
+            PipelineEventLog.shared.append("⚠️ vad.unavailable — no VAD model bundled", kind: .error)
+        }
+
         let transcriber = try resolveTranscriber()
 
         do {
-            return try transcriber.transcribe(
-                audioBuffer: normalizeAudio(audioBuffer),
-                language: language
+            return try TranscriptionEngine.run(
+                normalizedBuffer: normalized,
+                transcriber: transcriber,
+                vad: vad,
+                language: language,
+                decodeConfig: .default
             )
         } catch let error as WhisperError {
             throw TranscriptionPipelineError.transcriptionFailed(underlying: error)
         }
     }
 
-    /// Normalizes a Float32 audio buffer to a peak of ~0.95 so Whisper receives
-    /// clean, in-range samples. Handles both clipped (peak > 1.0) and quiet input.
-    private func normalizeAudio(_ samples: [Float]) -> [Float] {
-        let peak = samples.reduce(Float(0)) { max($0, abs($1)) }
-        // Below noise floor — amplifying would only boost noise, not speech.
-        guard peak > 0.001 else { return samples }
-        // Always scale: attenuates clipped audio (peak > 1.0) AND amplifies quiet audio.
-        // Cap amplification at 10× to avoid over-amplifying borderline-silent buffers.
-        let scale = min(0.95 / peak, 10.0)
-        return samples.map { $0 * scale }
+    /// Lazily resolves a VADProcessor bound to the bundled Silero model.
+    /// Returns nil only when the model cannot be located.
+    private func resolveVAD() -> VADProcessor? {
+        guard let vadModelPath = modelManager.resolveVADModelPath() else { return nil }
+        if let existing = vadProcessor, loadedVADModelPath == vadModelPath {
+            return existing
+        }
+        let processor = VADProcessor(modelPath: vadModelPath)
+        vadProcessor = processor
+        loadedVADModelPath = vadModelPath
+        return processor
     }
 
     /// Captures the model path at the moment of invocation to ensure model
@@ -103,5 +115,7 @@ final class TranscriptionPipeline {
     func shutdown() {
         transcriber = nil
         loadedModelPath = nil
+        vadProcessor = nil
+        loadedVADModelPath = nil
     }
 }

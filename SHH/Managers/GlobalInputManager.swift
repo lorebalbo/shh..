@@ -3,8 +3,9 @@ import CoreGraphics
 import Foundation
 
 /// Intercepts system-wide keyboard events via CGEvent Tap to detect Fn key
-/// press/release transitions, Space key presses for Lock-in mode, and
-/// Escape key presses for recording cancellation.
+/// press/release transitions, Space key presses for Lock-in mode,
+/// Escape key presses for recording cancellation, and the ⌃⌥⌘V shortcut
+/// that pastes the last transcript.
 ///
 /// Requires Accessibility permission (AXIsProcessTrusted) before the tap
 /// can be installed. The tap runs in active-filter mode (.defaultTap) so
@@ -33,6 +34,10 @@ final class GlobalInputManager {
     /// Reset on the next Fn press.
     private var fnPressConsumed = false
 
+    /// Tracks whether the last ⌃⌥⌘V key-down was consumed, so its key-up
+    /// (and any auto-repeats) are suppressed too.
+    private var pasteLastConsumed = false
+
     /// Modifier keys that must NOT change simultaneously with Fn for the
     /// event to be considered an isolated Fn key event.
     private static let otherModifierMask = CGEventFlags(rawValue:
@@ -42,6 +47,29 @@ final class GlobalInputManager {
         | CGEventFlags.maskCommand.rawValue
         | CGEventFlags.maskAlphaShift.rawValue
     )
+
+    /// Modifiers that decide which shortcut a key press is (Caps Lock is ignored).
+    private static let shortcutModifierMask = CGEventFlags(rawValue:
+        CGEventFlags.maskShift.rawValue
+        | CGEventFlags.maskControl.rawValue
+        | CGEventFlags.maskAlternate.rawValue
+        | CGEventFlags.maskCommand.rawValue
+    )
+
+    /// ⌃⌥⌘ — the modifiers of the paste-last-transcript shortcut. No macOS or
+    /// common app shortcut uses ⌃⌥⌘V, unlike ⌘⇧V (paste and match style).
+    private static let pasteLastModifiers = CGEventFlags(rawValue:
+        CGEventFlags.maskControl.rawValue
+        | CGEventFlags.maskAlternate.rawValue
+        | CGEventFlags.maskCommand.rawValue
+    )
+
+    private static let vKeyCode: Int64 = 9
+
+    /// Whether a key-down is the paste-last-transcript shortcut, ⌃⌥⌘V.
+    static func isPasteLastShortcut(keyCode: Int64, flags: CGEventFlags) -> Bool {
+        keyCode == vKeyCode && flags.intersection(shortcutModifierMask) == pasteLastModifiers
+    }
 
     /// Called when the Fn key is pressed (flag appeared in mask).
     /// Return `true` to consume the event (prevent it from reaching macOS).
@@ -58,6 +86,10 @@ final class GlobalInputManager {
     /// Called when the Escape key is pressed (.keyDown with keyCode 53).
     /// Return `true` to suppress the event.
     var onEscPress: (() -> Bool)?
+
+    /// Called when ⌃⌥⌘V is pressed (not on auto-repeat).
+    /// Return `true` to suppress the event.
+    var onPasteLastPress: (() -> Bool)?
 
     /// Called when the system disables the event tap and re-enablement is attempted.
     var onTapDisabled: (() -> Void)?
@@ -119,6 +151,7 @@ final class GlobalInputManager {
 
         previousFlags = []
         fnPressConsumed = false
+        pasteLastConsumed = false
         isRunning = false
     }
 
@@ -202,6 +235,14 @@ final class GlobalInputManager {
 
     private func handleKeyDown(event: CGEvent) -> Bool {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+        if Self.isPasteLastShortcut(keyCode: keyCode, flags: event.flags) {
+            // Holding the shortcut auto-repeats: suppress the repeats, paste once.
+            if event.getIntegerValueField(.keyboardEventAutorepeat) != 0 {
+                return pasteLastConsumed
+            }
+            pasteLastConsumed = onPasteLastPress?() ?? false
+            return pasteLastConsumed
+        }
         switch keyCode {
         case 49: // Space bar
             return onSpacePress?() ?? false
@@ -223,6 +264,10 @@ final class GlobalInputManager {
         case 63, 179:
             // Suppress Globe key-up if we consumed the Fn press
             return fnPressConsumed
+        case Self.vKeyCode:
+            // Suppress the V key-up of a consumed ⌃⌥⌘V, whatever modifiers are still held
+            defer { pasteLastConsumed = false }
+            return pasteLastConsumed
         default:
             return false
         }

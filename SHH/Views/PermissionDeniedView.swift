@@ -4,84 +4,67 @@ struct PermissionDeniedView: View {
     @Environment(PermissionManager.self) private var permissionManager
 
     var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "lock.shield")
-                .font(.custom("League Spartan", size: 42))
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Permissions needed")
+                .font(.inter(27, .semibold))
+                .tracking(-0.54)
+                .foregroundStyle(Graphite.text)
+                .accessibilityAddTraits(.isHeader)
+            Text("Shh.. needs these to hear you and to notice when you hold fn.")
+                .font(.inter(14))
+                .lineSpacing(4)
+                .foregroundStyle(Graphite.text2)
+                .padding(.top, 4)
+                .padding(.bottom, 24)
 
-            Text("Permissions Required")
-                .font(Font.appTitle2)
-                .fontWeight(.semibold)
+            permissionRow(
+                title: "Accessibility",
+                description: "Required for global hotkey detection and auto-paste.",
+                granted: permissionManager.accessibilityGranted,
+                isFirst: true,
+                action: { permissionManager.requestAccessibilityPermission() },
+                settingsAction: { permissionManager.openAccessibilitySettings() }
+            )
 
-            Text("Shh.. needs the following permissions to function correctly.")
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            VStack(spacing: 16) {
-                permissionRow(
-                    title: "Accessibility",
-                    description: "Required for global hotkey detection and auto-paste.",
-                    granted: permissionManager.accessibilityGranted,
-                    action: { permissionManager.requestAccessibilityPermission() },
-                    settingsAction: { permissionManager.openAccessibilitySettings() }
-                )
-
-                permissionRow(
-                    title: "Microphone",
-                    description: "Required to capture voice dictation.",
-                    granted: permissionManager.microphoneGranted,
-                    action: {
-                        Task { await permissionManager.requestMicrophonePermission() }
-                    },
-                    settingsAction: { permissionManager.openMicrophoneSettings() }
-                )
-            }
-            .padding()
-            .background(.background.secondary)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            permissionRow(
+                title: "Microphone",
+                description: "Required to capture voice dictation.",
+                granted: permissionManager.microphoneGranted,
+                action: {
+                    Task { await permissionManager.requestMicrophonePermission() }
+                },
+                settingsAction: { permissionManager.openMicrophoneSettings() }
+            )
         }
-        .padding(32)
-        .frame(width: 480)
+        .frame(width: 520)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Graphite.background)
         .onAppear {
             permissionManager.refreshPermissions()
         }
     }
 
-    @ViewBuilder
     private func permissionRow(
         title: String,
         description: String,
         granted: Bool,
+        isFirst: Bool = false,
         action: @escaping () -> Void,
         settingsAction: @escaping () -> Void
     ) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: granted ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .font(Font.appTitle3)
-                .foregroundStyle(granted ? .green : .red)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .fontWeight(.medium)
-                Text(description)
-                    .font(Font.appCaption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            if !granted {
-                Button("Grant Access") {
-                    action()
+        SettingRow(title, description: description, isFirst: isFirst) {
+            if granted {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold))
+                    Text("Granted")
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-
-                Button("Open Settings") {
-                    settingsAction()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .font(.inter(12.5))
+                .foregroundStyle(Graphite.text3)
+            } else {
+                Button("Open Settings", action: settingsAction)
+                    .buttonStyle(.graphite(.plain))
+                Button("Grant access", action: action)
+                    .buttonStyle(.graphite(.primary))
             }
         }
     }

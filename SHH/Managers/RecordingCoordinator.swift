@@ -7,11 +7,16 @@ import SwiftData
 /// to RecordingStateMachine transitions, and connecting those transitions
 /// to AudioCaptureManager and TranscriptionPipeline.
 ///
-/// On recording start, AudioCaptureManager begins capturing. On recording stop,
+/// On recording start, the Mac's sound is muted (unless turned off in Settings)
+/// and AudioCaptureManager begins capturing; the sound comes back when the
+/// recording stops, is cancelled, or is interrupted. On recording stop,
 /// the captured audio is dispatched to TranscriptionPipeline on a background
 /// queue. After transcription, the RAW text flows through TextProcessingPipeline
 /// for Style-based LLM processing, and the result is persisted to SwiftData.
 /// On pipeline completion, `onTranscriptionComplete` fires on the main thread.
+///
+/// A new recording can start while earlier ones are still processing; see
+/// TranscriptionQueue for which results are auto-pasted.
 final class RecordingCoordinator {
     let inputManager = GlobalInputManager()
     let stateMachine = RecordingStateMachine()
@@ -19,6 +24,8 @@ final class RecordingCoordinator {
     let transcriptionPipeline: TranscriptionPipeline
     let textProcessingPipeline: TextProcessingPipeline?
     let clipboardManager: ClipboardManager
+    let audioMuter: SystemAudioMuter
+    let transcriptionQueue = TranscriptionQueue()
     private let modelContext: ModelContext?
     private let logger = Logger(subsystem: "com.shh", category: "pipeline")
 
@@ -39,12 +46,14 @@ final class RecordingCoordinator {
         transcriptionPipeline: TranscriptionPipeline,
         textProcessingPipeline: TextProcessingPipeline? = nil,
         clipboardManager: ClipboardManager = ClipboardManager(),
+        audioMuter: SystemAudioMuter = SystemAudioMuter(),
         modelContext: ModelContext? = nil
     ) {
         self.audioCaptureManager = audioCaptureManager
         self.transcriptionPipeline = transcriptionPipeline
         self.textProcessingPipeline = textProcessingPipeline
         self.clipboardManager = clipboardManager
+        self.audioMuter = audioMuter
         self.modelContext = modelContext
         setupBindings()
     }
@@ -67,6 +76,7 @@ final class RecordingCoordinator {
     func shutdown() {
         inputManager.stop()
         _ = audioCaptureManager.stopRecording()
+        audioMuter.restore()
         // Drain any in-flight transcription so the WhisperTranscriber has no
         // active callers before we release it.
         processingQueue.sync {}
@@ -75,7 +85,23 @@ final class RecordingCoordinator {
 
     /// Enters lock-in recording mode directly (e.g., from overlay widget tap).
     func startLockIn() {
+        guard isTranscriptionEnabled else { return }
         stateMachine.startLockIn()
+    }
+
+    /// Pastes the most recent dictation into the focused app — the style's rewrite
+    /// if one was applied. Returns `false` when there is nothing to paste yet.
+    @discardableResult
+    func pasteLastTranscript() -> Bool {
+        guard let modelContext, let text = DictationEntry.lastPastableText(in: modelContext) else {
+            return false
+        }
+        PipelineEventLog.shared.append("📋 Pasting last transcript")
+        let clipboardManager = self.clipboardManager
+        DispatchQueue.main.async {
+            clipboardManager.autoPasteWhenModifiersReleased(text: text)
+        }
+        return true
     }
 
     /// Stops recording regardless of the current mode.
@@ -93,10 +119,23 @@ final class RecordingCoordinator {
 
     // MARK: - Private
 
+    /// The dashboard's "On-device transcription" switch. When off, fn is left to macOS
+    /// and no new recording starts; one already in progress can still finish.
+    private var isTranscriptionEnabled: Bool {
+        UserDefaults.standard.object(forKey: "transcriptionEnabled") as? Bool ?? true
+    }
+
+    /// The Settings "Mute sound while recording" switch.
+    private var isMuteWhileRecordingEnabled: Bool {
+        UserDefaults.standard.object(forKey: "muteAudioWhileRecording") as? Bool ?? true
+    }
+
     private func setupBindings() {
         // Wire input events → state machine
         inputManager.onFnPress = { [weak self] in
-            self?.stateMachine.handleFnPress() ?? false
+            guard let self else { return false }
+            if self.stateMachine.state == .idle && !self.isTranscriptionEnabled { return false }
+            return self.stateMachine.handleFnPress()
         }
         inputManager.onFnRelease = { [weak self] in
             self?.stateMachine.handleFnRelease() ?? false
@@ -107,10 +146,17 @@ final class RecordingCoordinator {
         inputManager.onEscPress = { [weak self] in
             self?.stateMachine.handleEscPress() ?? false
         }
+        inputManager.onPasteLastPress = { [weak self] in
+            self?.pasteLastTranscript() ?? false
+        }
 
         // Wire state machine → audio capture + transcription pipeline
         stateMachine.onRecordingDidStart = { [weak self] in
             guard let self else { return }
+            self.transcriptionQueue.recordingDidStart()
+            if self.isMuteWhileRecordingEnabled {
+                self.audioMuter.mute()
+            }
             do {
                 try self.audioCaptureManager.startRecording()
                 self.logger.info("Audio capture started")
@@ -118,6 +164,7 @@ final class RecordingCoordinator {
             } catch {
                 self.logger.error("Audio capture failed to start: \(error.localizedDescription)")
                 PipelineEventLog.shared.append("❌ Recording failed to start: \(error.localizedDescription)", kind: .error)
+                self.audioMuter.restore()
                 self.stateMachine.forceIdle()
                 self.onError?(error)
             }
@@ -126,6 +173,7 @@ final class RecordingCoordinator {
         stateMachine.onRecordingDidStop = { [weak self] mode in
             guard let self else { return }
             let audioBuffer = self.audioCaptureManager.stopRecording()
+            self.audioMuter.restore()
             let duration = String(format: "%.1f", Double(audioBuffer.count) / 16_000.0)
             self.logger.info("Recording stopped: \(audioBuffer.count) samples (\(duration)s)")
             PipelineEventLog.shared.append("⏹ Stopped — \(audioBuffer.count) samples (\(duration)s)")
@@ -143,31 +191,44 @@ final class RecordingCoordinator {
         stateMachine.onRecordingDidCancel = { [weak self] in
             guard let self else { return }
             _ = self.audioCaptureManager.stopRecording()
+            self.audioMuter.restore()
             self.logger.info("Recording cancelled")
             PipelineEventLog.shared.append("🚫 Recording cancelled")
         }
 
-        // Handle audio interruptions (e.g. microphone disconnect mid-recording)
+        // Handle audio interruptions (e.g. microphone disconnect mid-recording).
+        // They arrive on an audio thread; hop to main, where the state machine and
+        // transcription queue live.
         audioCaptureManager.onInterruption = { [weak self] audioBuffer, _ in
-            guard let self else { return }
+            nonisolated(unsafe) let weakSelf = self
+            DispatchQueue.main.async {
+                guard let self = weakSelf else { return }
+                self.audioMuter.restore()
 
-            let mode: RecordingMode
-            switch self.stateMachine.state {
-            case .pushToTalkActive: mode = .pushToTalk
-            case .continuousActive: mode = .continuous
-            case .lockInActive: mode = .lockIn
-            case .idle: return
+                let mode: RecordingMode
+                switch self.stateMachine.state {
+                case .pushToTalkActive: mode = .pushToTalk
+                case .continuousActive: mode = .continuous
+                case .lockInActive: mode = .lockIn
+                case .idle: return
+                }
+
+                self.stateMachine.forceIdle()
+
+                guard !audioBuffer.isEmpty else { return }
+
+                self.processTranscription(audioBuffer: audioBuffer, mode: mode)
             }
-
-            self.stateMachine.forceIdle()
-
-            guard !audioBuffer.isEmpty else { return }
-
-            self.processTranscription(audioBuffer: audioBuffer, mode: mode)
         }
     }
 
+    /// Must be called on the main thread.
     private func processTranscription(audioBuffer: [Float], mode: RecordingMode) {
+        let shouldAutoPaste = transcriptionQueue.enqueue()
+        if !shouldAutoPaste {
+            PipelineEventLog.shared.append("📥 Queued behind \(transcriptionQueue.pendingCount - 1) — will be saved without pasting")
+        }
+        nonisolated(unsafe) let queue = transcriptionQueue
         nonisolated(unsafe) let pipeline = self.transcriptionPipeline
         // Read the user's language preference at call time (UserDefaults is thread-safe for reads)
         let language = UserDefaults.standard.string(forKey: "transcriptionLanguage") ?? "auto"
@@ -195,8 +256,11 @@ final class RecordingCoordinator {
 
                 if rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     // No speech — still persist so user can play the audio back
-                    let result = TextProcessingResult(rawText: "(no speech detected)", processedText: nil, styleId: nil)
-                    DispatchQueue.main.async { self.persistDictationEntry(result: result, audioFilePath: audioFilePath) }
+                    let result = TextProcessingResult(rawText: DictationEntry.noSpeechText, processedText: nil, styleId: nil)
+                    DispatchQueue.main.async {
+                        self.persistDictationEntry(result: result, audioFilePath: audioFilePath)
+                        queue.finish()
+                    }
                     return
                 }
 
@@ -209,29 +273,39 @@ final class RecordingCoordinator {
                         let finalText = result.processedText ?? result.rawText
 
                         capturedSelf.persistDictationEntry(result: result, audioFilePath: audioFilePath)
-                        capturedSelf.clipboardManager.autoPaste(text: finalText)
+                        if shouldAutoPaste {
+                            capturedSelf.clipboardManager.autoPaste(text: finalText)
+                        }
                         capturedSelf.onTranscriptionComplete?(finalText, mode)
+                        queue.finish()
                     }
                 } else {
                     // No LLM pipeline — persist raw entry directly
                     let result = TextProcessingResult(rawText: rawText, processedText: nil, styleId: nil)
                     DispatchQueue.main.async {
                         self.persistDictationEntry(result: result, audioFilePath: audioFilePath)
-                        self.clipboardManager.autoPaste(text: rawText)
+                        if shouldAutoPaste {
+                            self.clipboardManager.autoPaste(text: rawText)
+                        }
                         self.onTranscriptionComplete?(rawText, mode)
+                        queue.finish()
                     }
                 }
             } catch {
                 self?.logger.error("Transcription error: \(error.localizedDescription)")
                 PipelineEventLog.shared.append("❌ Transcription error: \(error.localizedDescription)", kind: .error)
                 if let self {
-                    let result = TextProcessingResult(rawText: "(transcription error)", processedText: nil, styleId: nil)
+                    let result = TextProcessingResult(rawText: DictationEntry.transcriptionErrorText, processedText: nil, styleId: nil)
                     DispatchQueue.main.async {
                         self.persistDictationEntry(result: result, audioFilePath: nil)
                         self.onError?(error)
+                        queue.finish()
                     }
                 } else {
-                    DispatchQueue.main.async { self?.onError?(error) }
+                    DispatchQueue.main.async {
+                        self?.onError?(error)
+                        queue.finish()
+                    }
                 }
             }
         }

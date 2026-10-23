@@ -8,6 +8,7 @@ struct MenuBarView: View {
         Button("Open Dashboard") {
             NotificationCenter.default.post(name: .openDashboardWindow, object: nil)
         }
+        .keyboardShortcut("d")
 
         Divider()
 
