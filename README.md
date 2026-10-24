@@ -1,59 +1,57 @@
-# Shh..
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/banner-dark.svg">
+    <img src="docs/readme/banner-light.svg" alt="Shh.." width="400">
+  </picture>
+</p>
 
-**Voice dictation for macOS — local, private, LLM-powered.**
+<p align="center">
+  Hold fn. Say it. Done.<br>
+  Voice dictation for your Mac, <em>on-device and private</em>
+</p>
 
-Hold **Fn / Globe** to record. Release to transcribe. Text lands on your clipboard instantly.
+<p align="center">
+  <img src="docs/readme/promo.webp" alt="The Shh.. promo: the face-and-hand mark shushes the keyboard, fn is held, and the spoken words fly into a message and get pasted" width="800">
+</p>
 
-<video src="https://github.com/user-attachments/assets/52ea7ee6-fcda-47d6-91d1-b03a810777ce" autoplay loop muted playsinline width="100%"></video>
+Shh.. lives in your menu bar. Hold **fn**, say what you want to write, let go: the text is pasted wherever your cursor is.
 
----
+- **Transcribes on your Mac** with [whisper.cpp](https://github.com/ggml-org/whisper.cpp). Your voice never leaves it.
+- **Rewrites it in a Style** when you want one, like turning a ramble into an email, with OpenAI or a local model server.
+- **Keeps a history** of everything you said, searchable from the dashboard.
 
-## What it does
+> [!NOTE]
+> Styles send the transcript (the text, never the audio) to the provider you set up. With no Style selected, nothing leaves your Mac.
 
-Shh.. lives in your menu bar and listens only when you tell it to. Speech is transcribed **on-device** via [Whisper.cpp](https://github.com/ggerganov/whisper.cpp) — nothing leaves your machine unless you enable an LLM provider. When a Style is active, the raw transcript is optionally refined by an LLM before hitting your clipboard.
+## Install
 
-## Features
+Requires macOS 14+ on Apple Silicon, Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
-- **Hold-to-record** — press Fn/Globe to start, release to stop; Esc cancels
-- **On-device transcription** — Whisper models run locally, no cloud required
-- **Styles** — custom LLM prompts that reshape text (formal, bullet points, code comments, etc.)
-- **LLM providers** — bring your own API key (Anthropic Claude and compatible providers)
-- **Dictation history** — searchable log of every transcription in the dashboard
-- **Overlay widget** — floating waveform indicator shows recording state at a glance
-- **Language detection** — auto-detect or pin a specific language for transcription
-
-## Requirements
-
-- macOS 14 Sonoma or later
-- Microphone permission
-- Accessibility permission (for the global Fn key tap)
-- A Whisper model file (download via the app or `scripts/download-model.sh`)
-
-## Getting Started
-
-1. **Download** the latest `.dmg` from [Releases](../../releases) and drag Shh.. to Applications.
-2. **Launch** — grant Microphone and Accessibility permissions when prompted.
-3. **Download a Whisper model** from the *Whisper Models* section in the dashboard (tiny or base are good starting points).
-4. **Hold Fn / Globe** anywhere on your Mac to record. Release to transcribe and copy.
-
-### Optional: enable LLM Styles
-
-1. Open the dashboard → **LLM Providers** → add your API key.
-2. Go to **Styles** → create a style with a system prompt (e.g. *"Rewrite as concise bullet points"*).
-3. The overlay widget shows a style picker — select a style before recording.
-
-## Building from source
-
-```bash
-# Install dependencies
+```sh
 brew install xcodegen
-scripts/download-model.sh   # downloads whisper-base.bin into the app's support directory
-
-# Generate the Xcode project and build
-xcodegen generate
-xcodebuild build -project SHH.xcodeproj -scheme SHH -configuration Release
+git clone https://github.com/lorebalbo/shh...git
+cd shh..
+scripts/build-and-install.sh
 ```
 
-## Privacy
+The script downloads the Whisper Base model, builds a Release and installs it in `/Applications`. On first launch, grant **Microphone** (to hear you) and **Accessibility** (to notice fn and paste for you).
 
-All audio is processed locally. Transcription never leaves your device. An LLM provider is contacted only when a Style is active and you have configured an API key — the text sent is limited to the transcribed excerpt.
+## Use it
+
+| Do | To |
+| --- | --- |
+| Hold `fn` | Record, let go to transcribe and paste |
+| `esc` | Cancel the recording |
+| Click the widget | Record hands-free and pick a Style; click again to stop |
+| `⌃⌥⌘V` | Paste the last transcript again |
+
+Open the dashboard from the menu bar icon to write Styles, connect a provider, switch to a bigger Whisper model (Tiny to Large v3) or pin a language.
+
+## Develop
+
+```sh
+scripts/dev-build.sh --regen                                  # Debug build, launched in place
+xcodebuild test -project SHH.xcodeproj -scheme SHHTests       # unit tests
+```
+
+The transcription benchmark is described in [docs/benchmarks.md](docs/benchmarks.md).
