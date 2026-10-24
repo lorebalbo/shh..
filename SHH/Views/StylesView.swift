@@ -54,13 +54,13 @@ struct StylesView: View {
                     Image(systemName: "plus").font(.system(size: 11, weight: .semibold))
                     Text("New style")
                     Text("⌘N")
-                        .font(.inter(12))
-                        .foregroundStyle(Graphite.text3)
+                        .font(.sans(12))
+                        .foregroundStyle(Ink.text3)
                         .padding(.leading, 4)
                         .accessibilityHidden(true)
                 }
             }
-            .buttonStyle(.graphite(.ghost))
+            .buttonStyle(.ink(.ghost))
             .disabled(editing != nil)
         } content: {
             HairlineStack(rows, isHoverable: { row in
@@ -90,21 +90,21 @@ struct StylesView: View {
                     activate(style)
                 }
                 if isConfirming {
-                    Color.clear.frame(width: 28, height: 28)
+                    Color.clear.frame(width: 30, height: 30)
                 } else {
                     RowMenuButton(style.name) { styleMenuItems(style) }
-                        .padding(.top, -3)
+                        .padding(.top, -4)
                         .padding(.trailing, -6)
                 }
             }
             if isConfirming {
                 InlineConfirm(
-                    message: Text("Delete “\(style.name)”? This can't be undone.").foregroundColor(Graphite.text),
+                    message: Text("Delete “\(style.name)”? This can't be undone.").fontWeight(.medium).foregroundColor(Ink.text),
                     confirmTitle: "Delete",
                     onCancel: { confirmingDelete = nil },
                     onConfirm: { delete(style) }
                 )
-                .padding(.leading, 30)
+                .padding(.leading, 32)
             }
         }
         .listRowPadding()
@@ -120,7 +120,7 @@ struct StylesView: View {
             pick(isOn: isOn, name: "No style", description: "Copy the transcript exactly as it was heard.") {
                 activate(nil)
             }
-            Color.clear.frame(width: 28, height: 28)
+            Color.clear.frame(width: 30, height: 30)
         }
         .listRowPadding()
     }
@@ -129,15 +129,15 @@ struct StylesView: View {
         Button(action: action) {
             HStack(alignment: .top, spacing: 14) {
                 RadioMark(isOn: isOn)
-                    .padding(.top, 3)
+                    .padding(.top, 2)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(name)
-                        .font(.inter(14.5, .medium))
-                        .foregroundStyle(Graphite.text)
+                        .font(.sans(15, .semibold))
+                        .foregroundStyle(Ink.text)
                     Text(description)
-                        .font(.inter(14))
+                        .font(.sans(14))
                         .lineSpacing(4)
-                        .foregroundStyle(Graphite.text2)
+                        .foregroundStyle(Ink.text2)
                         .lineLimit(2)
                         .frame(maxWidth: 520, alignment: .leading)
                 }
@@ -172,11 +172,11 @@ struct StylesView: View {
     private var editor: some View {
         VStack(alignment: .leading, spacing: 16) {
             FieldBlock("Name") {
-                GraphiteTextField(placeholder: "Meeting notes", text: $draftName, focus: $focusedField, field: .name)
+                InkTextField(placeholder: "Meeting notes", text: $draftName, focus: $focusedField, field: .name)
                     .onSubmit { focusedField = .prompt }
             }
             FieldBlock("Instructions") {
-                GraphiteTextEditor(
+                InkTextEditor(
                     text: $draftPrompt,
                     placeholder: "Tell the model how to rewrite your transcript.",
                     focus: $focusedField,
@@ -185,22 +185,22 @@ struct StylesView: View {
             }
             HStack(spacing: 6) {
                 Text("⌘↩ save · esc cancel")
-                    .font(.inter(12))
-                    .foregroundStyle(Graphite.text3)
+                    .font(.sans(12))
+                    .foregroundStyle(Ink.text3)
                 Spacer(minLength: 0)
                 Button("Cancel", action: cancelEditing)
-                    .buttonStyle(.graphite(.plain))
+                    .buttonStyle(.ink(.plain))
                     .keyboardShortcut(.cancelAction)
                 Button(editing == .new ? "Create style" : "Save", action: save)
-                    .buttonStyle(.graphite(.primary))
+                    .buttonStyle(.ink(.primary))
                     .keyboardShortcut(.return, modifiers: .command)
                     .disabled(!isDraftValid)
             }
         }
         .padding(.top, 18)
         .padding(.bottom, 20)
-        .padding(.leading, 42)
-        .padding(.trailing, 12)
+        .padding(.leading, 46)
+        .padding(.trailing, 14)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(editing == .new ? "New style" : "Edit \(draftName)")
     }

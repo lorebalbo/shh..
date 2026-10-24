@@ -2,7 +2,8 @@ import SwiftUI
 
 // MARK: - Page frame
 
-/// Title, optional header actions and a subtitle, above a scrolling column capped at 680pt.
+/// A Rock 3D title, then the subtitle with optional header actions beside it, above a scrolling
+/// column capped at 680pt.
 struct PageScaffold<Actions: View, Content: View>: View {
     let page: DashboardPage
     let actions: () -> Actions
@@ -16,35 +17,33 @@ struct PageScaffold<Actions: View, Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 16) {
-                    Text(page.title)
-                        .font(.inter(27, .semibold))
-                        .tracking(-0.54)
-                        .foregroundStyle(Graphite.text)
-                        .lineLimit(1)
-                        .accessibilityAddTraits(.isHeader)
+            VStack(alignment: .leading, spacing: 0) {
+                DisplayText(page.title, size: 40, stroke: 1.1, lineHeight: 1.05)
+                    .foregroundStyle(Ink.text)
+                    .accessibilityAddTraits(.isHeader)
+                HStack(alignment: .top, spacing: 28) {
+                    Text(page.subtitle)
+                        .font(.sans(14))
+                        .lineSpacing(4)
+                        .foregroundStyle(Ink.text2)
+                        .frame(maxWidth: 480, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 12)
                     Spacer(minLength: 0)
                     HStack(spacing: 10) { actions() }
+                        .padding(.top, 10)
                 }
-                .frame(minHeight: 34)
-                Text(page.subtitle)
-                    .font(.inter(14))
-                    .lineSpacing(4)
-                    .foregroundStyle(Graphite.text2)
-                    .frame(maxWidth: 540, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, 44)
-            .padding(.top, 38)
+            .padding(.top, 36)
 
             ScrollView {
                 content()
                     .frame(maxWidth: 680, alignment: .leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 44)
-                    .padding(.top, 28)
-                    .padding(.bottom, 64)
+                    .padding(.top, 30)
+                    .padding(.bottom, 72)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -57,10 +56,23 @@ extension PageScaffold where Actions == EmptyView {
     }
 }
 
+/// A section title in Rock 3D: Today, Transcription, Whisper.
+struct SectionTitle: View {
+    let title: String
+
+    init(_ title: String) { self.title = title }
+
+    var body: some View {
+        DisplayText(title, size: 21, stroke: 0.6)
+            .foregroundStyle(Ink.text)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
 // MARK: - Hairline list
 
-/// Rows separated by inset hairlines, with a soft hover fill. Rows pad themselves.
-/// The list bleeds 12pt into the page margin so row text lines up with the page title.
+/// Rows separated by inset hairlines, with a soft rounded fill on hover. Rows pad themselves.
+/// The list bleeds 14pt into the page margin so row text lines up with the page title.
 struct HairlineStack<Item: Identifiable, Row: View>: View {
     let items: [Item]
     let isHoverable: (Item) -> Bool
@@ -80,15 +92,15 @@ struct HairlineStack<Item: Identifiable, Row: View>: View {
                 row(item)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
-                        hoverable && hoveredID == item.id ? Graphite.hover : .clear,
-                        in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        hoverable && hoveredID == item.id ? Ink.hover : .clear,
+                        in: RoundedRectangle(cornerRadius: 20, style: .continuous)
                     )
                     .overlay(alignment: .top) {
                         if index > 0 {
                             Rectangle()
-                                .fill(Graphite.hairline)
+                                .fill(Ink.hairline)
                                 .frame(height: 1)
-                                .padding(.horizontal, 12)
+                                .padding(.horizontal, 14)
                                 .opacity(hidesDivider(above: index) ? 0 : 1)
                         }
                     }
@@ -101,8 +113,8 @@ struct HairlineStack<Item: Identifiable, Row: View>: View {
                     }
             }
         }
-        .padding(.horizontal, -12)
-        .animation(.easeOut(duration: 0.12), value: hoveredID)
+        .padding(.horizontal, -14)
+        .animation(.easeOut(duration: 0.15), value: hoveredID)
     }
 
     private func hidesDivider(above index: Int) -> Bool {
@@ -114,13 +126,14 @@ struct HairlineStack<Item: Identifiable, Row: View>: View {
 extension View {
     /// The standard padding of a hairline list row.
     func listRowPadding() -> some View {
-        padding(.vertical, 16).padding(.horizontal, 12)
+        padding(.vertical, 16).padding(.horizontal, 14)
     }
 }
 
 // MARK: - Buttons
 
-struct GraphiteButtonStyle: ButtonStyle {
+/// Pills: ink for the primary action, a soft fill for secondary ones, bare text for the rest.
+struct InkButtonStyle: ButtonStyle {
     enum Kind { case primary, ghost, plain }
     let kind: Kind
 
@@ -136,44 +149,45 @@ struct GraphiteButtonStyle: ButtonStyle {
 
         var body: some View {
             configuration.label
-                .font(.inter(13, kind == .primary ? .semibold : .medium))
+                .font(.sans(13.5, .semibold))
                 .lineLimit(1)
                 .foregroundStyle(foreground)
-                .padding(.horizontal, kind == .plain ? 10 : 12)
-                .frame(height: 30)
-                .background(background, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                .opacity(configuration.isPressed ? 0.85 : 1)
+                .padding(.horizontal, kind == .plain ? 12 : 15)
+                .frame(height: 32)
+                .background(background, in: Capsule())
+                .contentShape(Capsule())
+                .scaleEffect(configuration.isPressed && isEnabled ? 0.96 : 1)
+                .animation(.spring(response: 0.25, dampingFraction: 0.6), value: configuration.isPressed)
                 .onHover { isHovered = $0 }
-                .animation(.easeOut(duration: 0.12), value: isHovered)
+                .animation(.easeOut(duration: 0.15), value: isHovered)
         }
 
         private var foreground: Color {
             switch kind {
-            case .primary: isEnabled ? Graphite.onAccent : Graphite.text3
-            case .ghost: isEnabled ? Graphite.text : Graphite.text3
-            case .plain: isHovered && isEnabled ? Graphite.text : Graphite.text2
+            case .primary: isEnabled ? Ink.paper : Ink.text3
+            case .ghost: isEnabled ? Ink.text : Ink.text3
+            case .plain: isHovered && isEnabled ? Ink.text : Ink.text2
             }
         }
 
         private var background: Color {
             let hovered = isHovered && isEnabled
             switch kind {
-            case .primary: return isEnabled ? (hovered ? Graphite.accentHover : Graphite.accent) : Graphite.fill
-            case .ghost: return hovered ? Graphite.fillHover : Graphite.fill
-            case .plain: return hovered ? Graphite.fill : .clear
+            case .primary: return isEnabled ? (hovered ? Ink.inkSoft : Ink.ink) : Ink.fill
+            case .ghost: return hovered ? Ink.fillHover : Ink.fill
+            case .plain: return hovered ? Ink.fill : .clear
             }
         }
     }
 }
 
-extension ButtonStyle where Self == GraphiteButtonStyle {
-    static func graphite(_ kind: GraphiteButtonStyle.Kind) -> GraphiteButtonStyle { .init(kind: kind) }
+extension ButtonStyle where Self == InkButtonStyle {
+    static func ink(_ kind: InkButtonStyle.Kind) -> InkButtonStyle { .init(kind: kind) }
 }
 
-/// A 28pt square glyph button.
-struct GraphiteIconButtonStyle: ButtonStyle {
-    var rest: Color = Graphite.text2
+/// A 30pt round glyph button.
+struct InkIconButtonStyle: ButtonStyle {
+    var rest: Color = Ink.text2
 
     func makeBody(configuration: Configuration) -> some View {
         IconButton(configuration: configuration, rest: rest)
@@ -188,40 +202,38 @@ struct GraphiteIconButtonStyle: ButtonStyle {
         var body: some View {
             let hovered = isHovered && isEnabled
             configuration.label
-                .foregroundStyle(hovered ? Graphite.text : rest)
-                .frame(width: 28, height: 28)
-                .background(hovered ? Graphite.fillHover : .clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-                .contentShape(Rectangle())
+                .foregroundStyle(hovered ? Ink.text : rest)
+                .frame(width: 30, height: 30)
+                .background(hovered ? Ink.fillHover : .clear, in: Circle())
+                .contentShape(Circle())
                 .opacity(isEnabled ? 1 : 0.4)
                 .onHover { isHovered = $0 }
         }
     }
 }
 
-/// Underlines on hover, like a text link.
+/// An underlined text link; the underline darkens to ink on hover.
 struct TextLink: View {
     let label: Text
-    var color: Color = Graphite.text2
-    var hoverColor: Color = Graphite.text
+    var color: Color = Ink.text
     let action: () -> Void
     @State private var isHovered = false
 
-    init(_ title: String, color: Color = Graphite.text2, hoverColor: Color = Graphite.text, action: @escaping () -> Void) {
-        self.init(label: Text(title), color: color, hoverColor: hoverColor, action: action)
+    init(_ title: String, color: Color = Ink.text, action: @escaping () -> Void) {
+        self.init(label: Text(title), color: color, action: action)
     }
 
-    init(label: Text, color: Color = Graphite.text2, hoverColor: Color = Graphite.text, action: @escaping () -> Void) {
+    init(label: Text, color: Color = Ink.text, action: @escaping () -> Void) {
         self.label = label
         self.color = color
-        self.hoverColor = hoverColor
         self.action = action
     }
 
     var body: some View {
         Button(action: action) {
             label
-                .underline(isHovered, color: Graphite.ink(0.35))
-                .foregroundStyle(isHovered ? hoverColor : color)
+                .underline(true, color: isHovered ? Ink.ink : Ink.off)
+                .foregroundStyle(color)
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
@@ -246,10 +258,10 @@ struct RowMenuButton<Items: View>: View {
         Menu(content: items) {
             Image(systemName: "ellipsis")
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(isHovered ? Graphite.text : Graphite.text3)
-                .frame(width: 28, height: 28)
-                .background(isHovered ? Graphite.fillHover : .clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-                .contentShape(Rectangle())
+                .foregroundStyle(isHovered ? Ink.text : Ink.text3)
+                .frame(width: 30, height: 30)
+                .background(isHovered ? Ink.fillHover : .clear, in: Circle())
+                .contentShape(Circle())
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
@@ -261,8 +273,8 @@ struct RowMenuButton<Items: View>: View {
     }
 }
 
-/// A filled pop-up button: the current value and a chevron.
-struct GraphiteMenu<Content: View>: View {
+/// A filled pill pop-up button: the current value and a chevron.
+struct InkMenu<Content: View>: View {
     let title: String
     let width: CGFloat
     let content: () -> Content
@@ -278,20 +290,20 @@ struct GraphiteMenu<Content: View>: View {
         Menu(content: content) {
             HStack(spacing: 8) {
                 Text(title)
-                    .font(.inter(13))
-                    .foregroundStyle(Graphite.text)
+                    .font(.sans(13.5, .medium))
+                    .foregroundStyle(Ink.text)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Graphite.text3)
+                    .foregroundStyle(Ink.text2)
             }
-            .padding(.leading, 11)
-            .padding(.trailing, 9)
-            .frame(width: width, height: 30)
-            .background(isHovered ? Graphite.fillHover : Graphite.fill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-            .contentShape(Rectangle())
+            .padding(.leading, 14)
+            .padding(.trailing, 11)
+            .frame(width: width, height: 32)
+            .background(isHovered ? Ink.fillHover : Ink.fill, in: Capsule())
+            .contentShape(Capsule())
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
@@ -304,86 +316,97 @@ struct GraphiteMenu<Content: View>: View {
 
 // MARK: - Toggles
 
-struct GraphiteSwitchStyle: ToggleStyle {
+/// Ink when on. The knob stretches like a drop as it slides across.
+struct InkSwitchStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         Button {
             configuration.isOn.toggle()
         } label: {
             Capsule()
-                .fill(configuration.isOn ? Graphite.accent : Graphite.switchOff)
-                .frame(width: 34, height: 20)
-                .overlay {
-                    Circle()
-                        .fill(.white)
-                        .frame(width: 16, height: 16)
-                        .shadow(color: .black.opacity(0.45), radius: 1, y: 1)
-                        .offset(x: configuration.isOn ? 7 : -7)
-                }
+                .fill(configuration.isOn ? Ink.ink : Ink.off)
+                .frame(width: 40, height: 24)
+                .overlay { Knob(isOn: configuration.isOn) }
                 .contentShape(Capsule())
-                .animation(.timingCurve(0.2, 0.7, 0.2, 1, duration: 0.15), value: configuration.isOn)
+                .animation(.easeOut(duration: 0.2), value: configuration.isOn)
         }
         .buttonStyle(.plain)
         .accessibilityRepresentation {
             Toggle(isOn: configuration.$isOn) { configuration.label }
         }
     }
+
+    private struct Knob: View {
+        let isOn: Bool
+
+        var body: some View {
+            Capsule()
+                .fill(Ink.paper)
+                .shadow(color: .black.opacity(0.18), radius: 1, y: 1)
+                .keyframeAnimator(initialValue: CGFloat(0), trigger: isOn) { knob, stretch in
+                    knob.frame(width: 18 + stretch, height: 18)
+                } keyframes: { _ in
+                    CubicKeyframe(9, duration: 0.1)
+                    CubicKeyframe(0, duration: 0.16)
+                }
+                .offset(x: isOn ? 8 : -8)
+                .animation(.timingCurve(0.2, 0.7, 0.2, 1, duration: 0.26), value: isOn)
+        }
+    }
 }
 
-extension ToggleStyle where Self == GraphiteSwitchStyle {
-    static var graphiteSwitch: GraphiteSwitchStyle { .init() }
+extension ToggleStyle where Self == InkSwitchStyle {
+    static var inkSwitch: InkSwitchStyle { .init() }
 }
 
+/// An ink ring that fills into an ink disc with a paper dot.
 struct RadioMark: View {
     let isOn: Bool
 
     var body: some View {
         ZStack {
-            Circle().strokeBorder(isOn ? Graphite.accent : Graphite.ink(0.32), lineWidth: 1.5)
+            Circle().strokeBorder(Ink.off, lineWidth: 2)
             Circle()
-                .fill(Graphite.accent)
-                .frame(width: 8, height: 8)
+                .fill(Ink.ink)
+                .overlay { Circle().fill(Ink.paper).frame(width: 6, height: 6) }
                 .scaleEffect(isOn ? 1 : 0.01)
         }
-        .frame(width: 16, height: 16)
-        .animation(.timingCurve(0.2, 0.7, 0.2, 1, duration: 0.15), value: isOn)
+        .frame(width: 18, height: 18)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isOn)
         .accessibilityHidden(true)
     }
 }
 
 // MARK: - Fields
 
-struct GraphiteFieldStyle: ViewModifier {
+/// A filled pill; focus turns it paper with an ink ring.
+struct InkFieldStyle<S: InsettableShape>: ViewModifier {
     let isFocused: Bool
+    let shape: S
     @State private var isHovered = false
 
     func body(content: Content) -> some View {
         content
-            .textFieldStyle(.plain)
-            .font(.inter(13.5))
-            .foregroundStyle(Graphite.text)
-            .focusEffectDisabled()
-            .padding(.horizontal, 11)
-            .frame(height: 34)
-            .background(
-                isFocused ? Graphite.fieldFocus : isHovered ? Graphite.fieldHover : Graphite.fill,
-                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .strokeBorder(Graphite.ring, lineWidth: isFocused ? 1 : 0)
-            }
+            .background(isFocused ? Ink.paper : isHovered ? Ink.fillHover : Ink.fill, in: shape)
+            .overlay { shape.strokeBorder(Ink.ink, lineWidth: isFocused ? 2 : 0) }
             .onHover { isHovered = $0 }
+            .animation(.easeOut(duration: 0.15), value: isFocused)
     }
 }
 
 extension View {
-    func graphiteField(focused: Bool) -> some View {
-        modifier(GraphiteFieldStyle(isFocused: focused))
+    func inkField(focused: Bool) -> some View {
+        textFieldStyle(.plain)
+            .font(.sans(13.5))
+            .foregroundStyle(Ink.text)
+            .focusEffectDisabled()
+            .padding(.horizontal, 15)
+            .frame(height: 38)
+            .modifier(InkFieldStyle(isFocused: focused, shape: Capsule()))
     }
 }
 
 /// A single-line field with its own placeholder: macOS ignores a `prompt`'s color.
-struct GraphiteTextField<Field: Hashable>: View {
+struct InkTextField<Field: Hashable>: View {
     let placeholder: String
     @Binding var text: String
     var isSecure = false
@@ -402,56 +425,49 @@ struct GraphiteTextField<Field: Hashable>: View {
         .overlay(alignment: .leading) {
             if text.isEmpty {
                 Text(placeholder)
-                    .font(.inter(13.5))
-                    .foregroundStyle(Graphite.text3)
+                    .font(.sans(13.5))
+                    .foregroundStyle(Ink.text3)
                     .lineLimit(1)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
         }
-        .graphiteField(focused: focus.wrappedValue == field)
+        .inkField(focused: focus.wrappedValue == field)
     }
 }
 
-/// A multi-line field with a placeholder, styled like `graphiteField`.
-struct GraphiteTextEditor<Field: Hashable>: View {
+/// A multi-line field with a placeholder, styled like `inkField` with softer corners.
+struct InkTextEditor<Field: Hashable>: View {
     @Binding var text: String
     let placeholder: String
     let focus: FocusState<Field?>.Binding
     let field: Field
-    @State private var isHovered = false
 
     var body: some View {
-        let isFocused = focus.wrappedValue == field
         TextEditor(text: $text)
-            .font(.inter(13.5))
+            .font(.sans(13.5))
             .lineSpacing(4)
-            .foregroundStyle(Graphite.text)
+            .foregroundStyle(Ink.text)
             .scrollContentBackground(.hidden)
             .focused(focus, equals: field)
             .focusEffectDisabled()
-            .padding(.horizontal, 6)
-            .padding(.vertical, 9)
-            .frame(minHeight: 96)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 11)
+            .frame(minHeight: 104)
             .overlay(alignment: .topLeading) {
                 if text.isEmpty {
                     Text(placeholder)
-                        .font(.inter(13.5))
-                        .foregroundStyle(Graphite.text3)
-                        .padding(.horizontal, 11)
-                        .padding(.vertical, 9)
+                        .font(.sans(13.5))
+                        .foregroundStyle(Ink.text3)
+                        .padding(.horizontal, 15)
+                        .padding(.vertical, 11)
                         .allowsHitTesting(false)
                 }
             }
-            .background(
-                isFocused ? Graphite.fieldFocus : isHovered ? Graphite.fieldHover : Graphite.fill,
-                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .strokeBorder(Graphite.ring, lineWidth: isFocused ? 1 : 0)
-            }
-            .onHover { isHovered = $0 }
+            .modifier(InkFieldStyle(
+                isFocused: focus.wrappedValue == field,
+                shape: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            ))
     }
 }
 
@@ -468,11 +484,11 @@ struct FieldBlock<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 5) {
-                Text(label).font(.inter(12.5, .medium)).foregroundStyle(Graphite.text2)
+                Text(label).font(.sans(12.5, .semibold)).foregroundStyle(Ink.text)
                 if isOptional {
-                    Text("optional").font(.inter(12.5)).foregroundStyle(Graphite.text3)
+                    Text("optional").font(.sans(12.5)).foregroundStyle(Ink.text3)
                 }
             }
             content()
@@ -492,11 +508,8 @@ struct SettingsGroup<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.inter(13.5, .semibold))
-                .foregroundStyle(Graphite.text)
-                .accessibilityAddTraits(.isHeader)
+        VStack(alignment: .leading, spacing: 6) {
+            SectionTitle(title)
             VStack(alignment: .leading, spacing: 0) { content() }
         }
     }
@@ -526,23 +539,23 @@ struct SettingRow<Control: View>: View {
 
     var body: some View {
         HStack(spacing: 24) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(label).font(.inter(14.5)).foregroundStyle(Graphite.text)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(label).font(.sans(15, .medium)).foregroundStyle(Ink.text)
                 if let description {
                     Text(description)
-                        .font(.inter(14))
+                        .font(.sans(14, isWarning ? .medium : .regular))
                         .lineSpacing(4)
-                        .foregroundStyle(isWarning ? Graphite.text : Graphite.text2)
+                        .foregroundStyle(isWarning ? Ink.text : Ink.text2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 6) { control() }
         }
-        .padding(.vertical, 18)
+        .padding(.vertical, 16)
         .overlay(alignment: .top) {
             if !isFirst {
-                Rectangle().fill(Graphite.hairline).frame(height: 1)
+                Rectangle().fill(Ink.hairline).frame(height: 1)
             }
         }
     }
@@ -550,6 +563,7 @@ struct SettingRow<Control: View>: View {
 
 // MARK: - Small pieces
 
+/// A key cap in ink.
 struct Kbd: View {
     let key: String
     var isCompact = false
@@ -561,26 +575,26 @@ struct Kbd: View {
 
     var body: some View {
         Text(key)
-            .font(.graphiteMono(isCompact ? 10.5 : 11.5, .medium))
-            .foregroundStyle(Graphite.text)
-            .padding(.horizontal, isCompact ? 4 : 5)
-            .frame(minWidth: isCompact ? 18 : 20, minHeight: isCompact ? 16 : 19)
-            .background(Graphite.ink(0.09), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .font(.inkMono(isCompact ? 10.5 : 11.5, .semibold))
+            .foregroundStyle(Ink.onInk)
+            .padding(.horizontal, isCompact ? 4 : 6)
+            .frame(minWidth: isCompact ? 18 : 22, minHeight: isCompact ? 17 : 21)
+            .background(Ink.ink, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
     }
 }
 
-/// "● In use" in the accent color.
+/// "● In use", in ink.
 struct DotLabel: View {
     let text: String
 
     init(_ text: String) { self.text = text }
 
     var body: some View {
-        HStack(spacing: 6) {
-            Circle().fill(Graphite.accent).frame(width: 6, height: 6)
-            Text(text)
+        HStack(spacing: 7) {
+            Circle().fill(Ink.ink).frame(width: 7, height: 7)
+            Text(text).fontWeight(.semibold)
         }
-        .foregroundStyle(Graphite.accent)
+        .foregroundStyle(Ink.text)
     }
 }
 
@@ -595,44 +609,54 @@ struct InlineConfirm: View {
     var body: some View {
         HStack(spacing: 8) {
             message
-                .font(.inter(14))
-                .foregroundStyle(Graphite.text2)
+                .font(.sans(14))
+                .foregroundStyle(Ink.text2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
             Button(cancelTitle, action: onCancel)
-                .buttonStyle(.graphite(.plain))
+                .buttonStyle(.ink(.plain))
                 .keyboardShortcut(.cancelAction)
             Button(confirmTitle, action: onConfirm)
-                .buttonStyle(.graphite(.primary))
+                .buttonStyle(.ink(.primary))
         }
     }
 }
 
+/// A centred message for an empty page, optionally under the mark.
 struct EmptyState<Accessory: View>: View {
     let title: String
+    var showsMark = false
     let accessory: () -> Accessory
 
-    init(_ title: String, @ViewBuilder accessory: @escaping () -> Accessory) {
+    init(_ title: String, showsMark: Bool = false, @ViewBuilder accessory: @escaping () -> Accessory) {
         self.title = title
+        self.showsMark = showsMark
         self.accessory = accessory
     }
 
     var body: some View {
         VStack(spacing: 6) {
-            Text(title).font(.inter(15, .medium)).foregroundStyle(Graphite.text)
+            if showsMark {
+                InkMarkView(spraysOnHover: true)
+                    .frame(width: 92, height: 105)
+                    .foregroundStyle(Ink.ink)
+                    .padding(.bottom, 14)
+            }
+            DisplayText(title, size: 21, stroke: 0.6)
+                .foregroundStyle(Ink.text)
             accessory()
         }
-        .font(.inter(14))
-        .foregroundStyle(Graphite.text2)
+        .font(.sans(14))
+        .foregroundStyle(Ink.text2)
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)
-        .padding(.top, 64)
+        .padding(.top, 44)
         .padding(.bottom, 24)
     }
 }
 
-/// A small text button that only shows a fill on hover, like a row's "Download".
-struct GraphiteChipButtonStyle: ButtonStyle {
+/// A small filled pill that turns ink on hover, like a row's "Download".
+struct InkChipButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         Chip(configuration: configuration)
     }
@@ -645,14 +669,15 @@ struct GraphiteChipButtonStyle: ButtonStyle {
         var body: some View {
             let hovered = isHovered && isEnabled
             configuration.label
-                .font(.inter(12.5))
-                .foregroundStyle(hovered ? Graphite.text : Graphite.text2)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(hovered ? Graphite.fillHover : .clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .contentShape(Rectangle())
+                .font(.sans(12.5, .semibold))
+                .foregroundStyle(hovered ? Ink.paper : Ink.text)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(hovered ? Ink.ink : Ink.fill, in: Capsule())
+                .contentShape(Capsule())
                 .opacity(isEnabled ? 1 : 0.45)
                 .onHover { isHovered = $0 }
+                .animation(.easeOut(duration: 0.15), value: hovered)
         }
     }
 }
@@ -663,15 +688,15 @@ private struct HoverFill: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .background(isHovered ? Graphite.hover : .clear, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .background(isHovered ? Ink.hover : .clear, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .onHover { isHovered = $0 }
-            .animation(.easeOut(duration: 0.12), value: isHovered)
+            .animation(.easeOut(duration: 0.15), value: isHovered)
     }
 }
 
 extension View {
     /// A soft fill while the pointer is over the view.
-    func hoverFill(cornerRadius: CGFloat = 9) -> some View {
+    func hoverFill(cornerRadius: CGFloat = 20) -> some View {
         modifier(HoverFill(cornerRadius: cornerRadius))
     }
 }

@@ -27,14 +27,14 @@ struct HelpView: View {
                 SettingsGroup("About") {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Shh.. turns speech into text on your Mac with on-device models like Whisper, and can rewrite it with an AI style before you paste.")
-                            .font(.inter(14))
+                            .font(.sans(14))
                             .lineSpacing(4)
-                            .foregroundStyle(Graphite.text2)
+                            .foregroundStyle(Ink.text2)
                             .frame(maxWidth: 520, alignment: .leading)
                             .fixedSize(horizontal: false, vertical: true)
                         Text("Version \(version)")
-                            .font(.inter(12.5))
-                            .foregroundStyle(Graphite.text3)
+                            .font(.sans(12.5))
+                            .foregroundStyle(Ink.text3)
                     }
                     .padding(.top, 6)
                 }
@@ -45,30 +45,30 @@ struct HelpView: View {
     private func step(_ number: Int, _ title: String, _ description: String, link: (String, DashboardPage)? = nil) -> some View {
         HStack(alignment: .top, spacing: 16) {
             Text("\(number)")
-                .font(.inter(12.5))
+                .font(.sans(12.5, .bold))
                 .monospacedDigit()
-                .foregroundStyle(Graphite.text3)
-                .frame(width: 14, alignment: .leading)
-                .padding(.top, 2)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.inter(14.5)).foregroundStyle(Graphite.text)
+                .foregroundStyle(Ink.onInk)
+                .frame(width: 24, height: 24)
+                .background(Ink.ink, in: Circle())
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.sans(15, .medium)).foregroundStyle(Ink.text)
                 Text(description)
-                    .font(.inter(14))
+                    .font(.sans(14))
                     .lineSpacing(4)
-                    .foregroundStyle(Graphite.text2)
+                    .foregroundStyle(Ink.text2)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if let link {
                 TextLink(link.0) { dashboard.page = link.1 }
-                    .font(.inter(12.5))
+                    .font(.sans(13, .medium))
                     .padding(.top, 2)
             }
         }
-        .padding(.vertical, 18)
+        .padding(.vertical, 16)
         .overlay(alignment: .top) {
             if number > 1 {
-                Rectangle().fill(Graphite.hairline).frame(height: 1)
+                Rectangle().fill(Ink.hairline).frame(height: 1)
             }
         }
     }
@@ -78,8 +78,8 @@ struct HelpView: View {
             HStack(spacing: 4) {
                 if let note {
                     Text(note)
-                        .font(.inter(12.5))
-                        .foregroundStyle(Graphite.text3)
+                        .font(.sans(12.5))
+                        .foregroundStyle(Ink.text3)
                         .padding(.trailing, 4)
                 }
                 ForEach(keys, id: \.self) { Kbd($0) }

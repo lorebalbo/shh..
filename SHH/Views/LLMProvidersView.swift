@@ -51,17 +51,17 @@ struct LLMProvidersView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Graphite.text3)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Ink.text3)
                             .rotationEffect(.degrees(isOpen ? 90 : 0))
-                            .frame(width: 24, height: 24)
-                        VStack(alignment: .leading, spacing: 3) {
+                            .frame(width: 26, height: 26)
+                        VStack(alignment: .leading, spacing: 1) {
                             Text(type.displayName)
-                                .font(.inter(14.5, .medium))
-                                .foregroundStyle(Graphite.text)
+                                .font(.sans(15, .semibold))
+                                .foregroundStyle(Ink.text)
                             meta(config)
-                                .font(.inter(12.5))
-                                .foregroundStyle(Graphite.text3)
+                                .font(.sans(12.5))
+                                .foregroundStyle(Ink.text3)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                         }
@@ -80,7 +80,7 @@ struct LLMProvidersView: View {
                     get: { config.isActive },
                     set: { setActive(config, $0) }
                 ))
-                .toggleStyle(.graphiteSwitch)
+                .toggleStyle(.inkSwitch)
                 .labelsHidden()
             }
 
@@ -88,11 +88,11 @@ struct LLMProvidersView: View {
                 connection(config)
                     .padding(.top, 20)
                     .padding(.bottom, 6)
-                    .padding(.leading, 28)
+                    .padding(.leading, 30)
             }
         }
         .listRowPadding()
-        .animation(.timingCurve(0.2, 0.7, 0.2, 1, duration: 0.15), value: isOpen)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isOpen)
     }
 
     private func meta(_ config: LLMProviderConfig) -> Text {
@@ -111,7 +111,7 @@ struct LLMProvidersView: View {
         if !config.modelName.isEmpty && !choices.contains(config.modelName) {
             choices.insert(config.modelName, at: 0)
         }
-        return GraphiteMenu(config.modelName.isEmpty ? "Choose a model" : config.modelName, width: 184) {
+        return InkMenu(config.modelName.isEmpty ? "Choose a model" : config.modelName, width: 184) {
             if choices.isEmpty {
                 Button(fetchStatus[type] == .loading ? "Fetching models…" : "No models yet") {}
                     .disabled(true)
@@ -146,7 +146,7 @@ struct LLMProvidersView: View {
             HStack(alignment: .top, spacing: 16) {
                 if type.isCloud {
                     FieldBlock("API key") {
-                        GraphiteTextField(
+                        InkTextField(
                             placeholder: "sk-…",
                             text: binding(config, \.apiKey),
                             isSecure: true,
@@ -158,7 +158,7 @@ struct LLMProvidersView: View {
                     .frame(maxWidth: .infinity)
                 }
                 FieldBlock("Endpoint URL", isOptional: type.isCloud) {
-                    GraphiteTextField(
+                    InkTextField(
                         placeholder: type.isCloud ? "https://api.openai.com/v1" : "http://localhost:1234/v1",
                         text: binding(config, \.endpointURL),
                         focus: $focusedField,
@@ -178,14 +178,14 @@ struct LLMProvidersView: View {
                         Text("Fetch models")
                     }
                 }
-                .buttonStyle(.graphite(.ghost))
+                .buttonStyle(.ink(.ghost))
                 .disabled(fetchStatus[type] == .loading)
 
                 Group {
                     switch fetchStatus[type] {
                     case .loading:
-                        HStack(spacing: 6) {
-                            ProgressView().controlSize(.mini)
+                        HStack(spacing: 8) {
+                            InkDrops(motion: .loading)
                             Text("Fetching models…")
                         }
                     case .done(let message):
@@ -194,16 +194,16 @@ struct LLMProvidersView: View {
                         EmptyView()
                     }
                 }
-                .font(.inter(12.5))
-                .foregroundStyle(Graphite.text3)
+                .font(.sans(12.5))
+                .foregroundStyle(Ink.text2)
                 .lineLimit(1)
 
                 Spacer(minLength: 0)
 
                 Button("Done") { toggleExpanded(type) }
-                    .buttonStyle(.graphite(.plain))
+                    .buttonStyle(.ink(.plain))
                     .keyboardShortcut(.cancelAction)
-                    .padding(.trailing, -10)
+                    .padding(.trailing, -12)
             }
         }
     }
