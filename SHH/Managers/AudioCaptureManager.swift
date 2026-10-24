@@ -116,6 +116,14 @@ final class AudioCaptureManager {
         }
     }
 
+    /// Maps a buffer's RMS to 0–1 on a decibel scale, so speech fills most of the range:
+    /// a quiet room (-55 dBFS) reads 0, talking (around -35 dBFS) about 0.7, and -25 dBFS
+    /// and louder read 1.
+    static func displayLevel(rms: Float) -> Float {
+        let decibels = 20 * log10(max(rms, 1e-6))
+        return min(max((decibels + 55) / 30, 0), 1)
+    }
+
     // MARK: - Private
 
     private func processAudioBuffer(
@@ -160,8 +168,7 @@ final class AudioCaptureManager {
         // Compute RMS audio level for real-time visualisation
         let sumOfSquares = samples.reduce(Float(0)) { $0 + $1 * $1 }
         let rms = sqrt(sumOfSquares / max(Float(samples.count), 1))
-        let normalised = min(rms * 4.0, 1.0) // Scale up for visual sensitivity
-        audioLevelSubject.send(normalised)
+        audioLevelSubject.send(Self.displayLevel(rms: rms))
 
         let currentTotal = isWritingToFile ? totalSamplesWritten : audioBuffer.count
         if currentTotal + samples.count > fiveMinuteSampleThreshold && !isWritingToFile {
