@@ -19,7 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.applicationIconImage = makeAppIcon()
-        Graphite.registerFonts()
+        Ink.registerFonts()
 
         // Request microphone access early so the system dialog appears immediately
         // rather than silently capturing silence the first time the user records.
@@ -39,7 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .environment(permissionManager)
                 .modelContainer(container)
 
-            // Graphite: one dark surface edge to edge, with the traffic lights over the sidebar.
+            // Ink: one paper surface edge to edge, with the traffic lights over the ink sidebar.
+            // Follows the system appearance: Paper in light mode, its negative in dark mode.
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 800, height: 550),
                 styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -53,8 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.title = "Shh.."
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
-            window.appearance = NSAppearance(named: .darkAqua)
-            window.backgroundColor = Graphite.windowBackground
+            window.backgroundColor = Ink.windowBackground
             dashboardWindow = window
         }
 
@@ -149,13 +149,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func makeAppIcon() -> NSImage {
         // 1024×1024 canvas per Apple HIG for macOS Big Sur+ icons.
         let canvasSize = CGSize(width: 1024, height: 1024)
-        // The app's Spice oranges: Graphite.accentHover, Graphite.accent, brand Spice.
-        let spice = [
-            NSColor(srgbRed: 244 / 255.0, green: 124 / 255.0, blue: 96 / 255.0, alpha: 1.0),
-            NSColor(srgbRed: 242 / 255.0, green: 106 / 255.0, blue: 75 / 255.0, alpha: 1.0),
-            NSColor(srgbRed: 233 / 255.0, green: 79 / 255.0, blue: 55 / 255.0, alpha: 1.0),
+        // Paper, lit: white at the lit corner to a warm grey; the mark in the dashboard's ink.
+        let paper = [
+            NSColor(srgbRed: 1.0, green: 1.0, blue: 1.0, alpha: 1.0),
+            NSColor(srgbRed: 246 / 255.0, green: 245 / 255.0, blue: 242 / 255.0, alpha: 1.0),
+            NSColor(srgbRed: 228 / 255.0, green: 226 / 255.0, blue: 221 / 255.0, alpha: 1.0),
         ]
-        let fgColor = NSColor(srgbRed: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)
+        let fgColor = NSColor(srgbRed: 13 / 255.0, green: 13 / 255.0, blue: 13 / 255.0, alpha: 1.0)
 
         return NSImage(size: canvasSize, flipped: false) { rect in
             // Apple icon grid: squircle inset ~100pt from each edge → 824×824 shape.
@@ -163,12 +163,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let iconRect = rect.insetBy(dx: iconInset, dy: iconInset)
             let cornerRadius: CGFloat = 185
 
+            let squircle = NSBezierPath(roundedRect: iconRect, xRadius: cornerRadius, yRadius: cornerRadius)
+
+            // A soft shadow under the squircle, as in Apple's icon template, so the white
+            // shape keeps its edge on light backgrounds.
+            NSGraphicsContext.saveGraphicsState()
+            let shadow = NSShadow()
+            shadow.shadowOffset = NSSize(width: 0, height: -10)
+            shadow.shadowBlurRadius = 24
+            shadow.shadowColor = NSColor.black.withAlphaComponent(0.3)
+            shadow.set()
+            NSColor.white.setFill()
+            squircle.fill()
+            NSGraphicsContext.restoreGraphicsState()
+
             // Lit from far beyond the top-right corner: a radial gradient centred
             // outside the shape, lit at the nearest corner, shaded at the farthest.
             let light = NSPoint(x: iconRect.maxX + iconRect.width * 0.35, y: iconRect.maxY + iconRect.height * 0.35)
             NSGraphicsContext.saveGraphicsState()
-            NSBezierPath(roundedRect: iconRect, xRadius: cornerRadius, yRadius: cornerRadius).addClip()
-            NSGradient(colors: spice, atLocations: [0, 0.5, 1], colorSpace: .sRGB)?.draw(
+            squircle.addClip()
+            NSGradient(colors: paper, atLocations: [0, 0.5, 1], colorSpace: .sRGB)?.draw(
                 fromCenter: light, radius: hypot(light.x - iconRect.maxX, light.y - iconRect.maxY),
                 toCenter: light, radius: hypot(light.x - iconRect.minX, light.y - iconRect.minY),
                 options: [.drawsBeforeStartingLocation, .drawsAfterEndingLocation]
@@ -178,8 +192,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let mark = NSImage(named: "AppMark"),
                   let context = NSGraphicsContext.current?.cgContext else { return true }
 
-            // Mark at 56% of the icon shape height, matching scripts/generate-icon.swift.
-            let targetHeight = iconRect.height * 0.56
+            // Mark at 62% of the icon shape height, matching scripts/generate-icon.swift.
+            let targetHeight = iconRect.height * 0.62
             let scaledWidth = mark.size.width * targetHeight / mark.size.height
             let drawRect = NSRect(
                 x: iconRect.midX - scaledWidth / 2,
@@ -187,7 +201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 width: scaledWidth,
                 height: targetHeight
             )
-            // Tint white: draw the mark's alpha, then paint the colour through it.
+            // Tint ink: draw the mark's alpha, then paint the colour through it.
             context.beginTransparencyLayer(auxiliaryInfo: nil)
             mark.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1.0)
             fgColor.setFill()

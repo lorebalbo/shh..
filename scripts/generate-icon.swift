@@ -4,7 +4,7 @@
 /// Usage: swift generate-icon.swift <output-dir>
 /// The output directory should be SHH/Assets.xcassets/AppIcon.appiconset/
 ///
-/// Renders the exact same orange squircle + mark icon as AppDelegate.makeAppIcon().
+/// Renders the exact same paper squircle + ink mark icon as AppDelegate.makeAppIcon().
 /// The mark is read from SHH/Assets.xcassets/AppMark.imageset/AppMark.png.
 import AppKit
 import CoreGraphics
@@ -51,7 +51,7 @@ let sizes: [IconSize] = [
 // MARK: - Drawing
 
 /// Mark height as a fraction of the squircle's height.
-let markHeightRatio: CGFloat = 0.56
+let markHeightRatio: CGFloat = 0.62
 
 func makeIcon(pixels: Int) -> CGImage {
     let size = CGFloat(pixels)
@@ -69,21 +69,31 @@ func makeIcon(pixels: Int) -> CGImage {
     let iconRect = CGRect(x: inset, y: inset, width: size - inset * 2, height: size - inset * 2)
     let radius  = 185.0 * scale
 
-    // Background squircle in the app's Spice oranges, lit from far beyond the top-right
-    // corner: a radial gradient centred outside the shape, from the lit corner
-    // (Graphite.accentHover) through Graphite.accent to the brand Spice at the farthest.
+    // A soft shadow under the squircle, as in Apple's icon template, so the white shape
+    // keeps its edge on light backgrounds.
+    let squircle = CGPath(roundedRect: iconRect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+    ctx.saveGState()
+    ctx.setShadow(offset: CGSize(width: 0, height: -10 * scale), blur: 24 * scale,
+                  color: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.3))
+    ctx.addPath(squircle)
+    ctx.setFillColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1))
+    ctx.fillPath()
+    ctx.restoreGState()
+
+    // Background squircle in paper, lit from far beyond the top-right corner: a radial
+    // gradient centred outside the shape, from white at the lit corner to a warm grey.
     let light = CGPoint(x: iconRect.maxX + iconRect.width * 0.35, y: iconRect.maxY + iconRect.height * 0.35)
     let gradient = CGGradient(
         colorsSpace: colorSpace,
         colors: [
-            CGColor(srgbRed: 244/255.0, green: 124/255.0, blue: 96/255.0, alpha: 1.0),
-            CGColor(srgbRed: 242/255.0, green: 106/255.0, blue: 75/255.0, alpha: 1.0),
-            CGColor(srgbRed: 233/255.0, green: 79/255.0, blue: 55/255.0, alpha: 1.0),
+            CGColor(srgbRed: 1.0, green: 1.0, blue: 1.0, alpha: 1.0),
+            CGColor(srgbRed: 246/255.0, green: 245/255.0, blue: 242/255.0, alpha: 1.0),
+            CGColor(srgbRed: 228/255.0, green: 226/255.0, blue: 221/255.0, alpha: 1.0),
         ] as CFArray,
         locations: [0, 0.5, 1]
     )!
     ctx.saveGState()
-    ctx.addPath(CGPath(roundedRect: iconRect, cornerWidth: radius, cornerHeight: radius, transform: nil))
+    ctx.addPath(squircle)
     ctx.clip()
     ctx.drawRadialGradient(
         gradient,
@@ -93,7 +103,7 @@ func makeIcon(pixels: Int) -> CGImage {
     )
     ctx.restoreGState()
 
-    // Mark, tinted white: draw its alpha, then paint the colour through it.
+    // Mark, tinted ink (Ink.ink, #0D0D0D): draw its alpha, then paint the colour through it.
     let markH = iconRect.height * markHeightRatio
     let markW = markH * CGFloat(markImage.width) / CGFloat(markImage.height)
     let markRect = CGRect(
@@ -105,7 +115,7 @@ func makeIcon(pixels: Int) -> CGImage {
     ctx.beginTransparencyLayer(auxiliaryInfo: nil)
     ctx.draw(markImage, in: markRect)
     ctx.setBlendMode(.sourceIn)
-    ctx.setFillColor(CGColor(srgbRed: 1.0, green: 1.0, blue: 1.0, alpha: 1.0))
+    ctx.setFillColor(CGColor(srgbRed: 13/255.0, green: 13/255.0, blue: 13/255.0, alpha: 1.0))
     ctx.fill(markRect)
     ctx.endTransparencyLayer()
 

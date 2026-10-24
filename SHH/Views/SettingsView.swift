@@ -27,7 +27,7 @@ struct SettingsView: View {
                         description: "Auto-detect works for most speech. Pin a language if it guesses wrong.",
                         isFirst: true
                     ) {
-                        GraphiteMenu(currentLanguageLabel, width: 168) {
+                        InkMenu(currentLanguageLabel, width: 168) {
                             Picker("Language", selection: $transcriptionLanguage) {
                                 Text("Auto-detect").tag("auto")
                                 Divider()
@@ -45,7 +45,7 @@ struct SettingsView: View {
                         description: "Silence your Mac while you speak so nothing it plays gets picked up. Sound comes back when you stop."
                     ) {
                         Toggle("Mute sound while recording", isOn: $muteAudioWhileRecording)
-                            .toggleStyle(.graphiteSwitch)
+                            .toggleStyle(.inkSwitch)
                             .labelsHidden()
                     }
                 }
@@ -53,7 +53,7 @@ struct SettingsView: View {
                 SettingsGroup("General") {
                     SettingRow("Launch at login", description: "Start Shh.. in the menu bar when you log in.", isFirst: true) {
                         Toggle("Launch at login", isOn: $launchAtLogin)
-                            .toggleStyle(.graphiteSwitch)
+                            .toggleStyle(.inkSwitch)
                             .labelsHidden()
                     }
                     SettingRow(
@@ -65,13 +65,13 @@ struct SettingsView: View {
                     ) {
                         if isConfirmingClear {
                             Button("Cancel") { isConfirmingClear = false }
-                                .buttonStyle(.graphite(.plain))
+                                .buttonStyle(.ink(.plain))
                                 .keyboardShortcut(.cancelAction)
                             Button("Delete all", action: clearHistory)
-                                .buttonStyle(.graphite(.primary))
+                                .buttonStyle(.ink(.primary))
                         } else {
                             Button("Clear…") { isConfirmingClear = true }
-                                .buttonStyle(.graphite(.ghost))
+                                .buttonStyle(.ink(.ghost))
                                 .disabled(count == 0)
                         }
                     }

@@ -49,20 +49,23 @@ struct SpeechModelsView: View {
     var body: some View {
         PageScaffold(.speech) {
             Text("On-device transcription")
-                .font(.inter(13))
-                .foregroundStyle(Graphite.text2)
+                .font(.sans(13.5, .medium))
+                .foregroundStyle(Ink.text)
                 .onTapGesture { transcriptionEnabled.toggle() }
                 .accessibilityHidden(true)
             Toggle("On-device transcription", isOn: $transcriptionEnabled)
-                .toggleStyle(.graphiteSwitch)
+                .toggleStyle(.inkSwitch)
                 .labelsHidden()
         } content: {
             VStack(alignment: .leading, spacing: 0) {
                 if !transcriptionEnabled {
-                    Text("Transcription is off. Holding fn won't record until you turn it back on.")
-                        .font(.inter(14))
-                        .foregroundStyle(Graphite.text)
-                        .padding(.bottom, 22)
+                    HStack(spacing: 10) {
+                        Circle().strokeBorder(Ink.ink, lineWidth: 2).frame(width: 9, height: 9)
+                        Text("Transcription is off. Holding fn won't record until you turn it back on.")
+                            .font(.sans(14, .medium))
+                            .foregroundStyle(Ink.text)
+                    }
+                    .padding(.bottom, 24)
                 }
                 VStack(spacing: 0) {
                     ForEach(Array(SpeechEngine.all.enumerated()), id: \.element.id) { index, engine in
@@ -70,17 +73,17 @@ struct SpeechModelsView: View {
                             .padding(.vertical, 6)
                             .overlay(alignment: .top) {
                                 if index > 0 {
-                                    Rectangle().fill(Graphite.hairline).frame(height: 1).padding(.horizontal, 12)
+                                    Rectangle().fill(Ink.hairline).frame(height: 1).padding(.horizontal, 14)
                                 }
                             }
-                            .padding(.top, index == 0 ? 0 : 8)
+                            .padding(.top, index == 0 ? 0 : 10)
                     }
                 }
-                .padding(.horizontal, -12)
+                .padding(.horizontal, -14)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { listWidth = $0 }
                 .opacity(transcriptionEnabled ? 1 : 0.4)
                 .allowsHitTesting(transcriptionEnabled)
-                .animation(.easeOut(duration: 0.15), value: transcriptionEnabled)
+                .animation(.easeOut(duration: 0.2), value: transcriptionEnabled)
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Speech model")
             }
@@ -102,17 +105,15 @@ struct SpeechModelsView: View {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Graphite.text3)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Ink.text3)
                         .rotationEffect(.degrees(isOpen ? 90 : 0))
-                        .frame(width: 16)
-                    Text(engine.name)
-                        .font(.inter(14.5, .semibold))
-                        .foregroundStyle(Graphite.text)
+                        .frame(width: 18)
+                    SectionTitle(engine.name)
                         .fixedSize()
                     Text(engine.meta)
-                        .font(.inter(12.5))
-                        .foregroundStyle(Graphite.text3)
+                        .font(.sans(12.5))
+                        .foregroundStyle(Ink.text3)
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .help(engine.meta)
@@ -122,22 +123,22 @@ struct SpeechModelsView: View {
                             DotLabel("\(inUse.displayName) in use")
                         }
                         if onDisk > 0 {
-                            Text("\(Graphite.formatBytes(onDisk)) on disk").monospacedDigit()
+                            Text("\(Ink.formatBytes(onDisk)) on disk").monospacedDigit()
                         } else {
                             Text("Not downloaded")
                         }
                     }
-                    .font(.inter(12.5))
-                    .foregroundStyle(Graphite.text3)
+                    .font(.sans(12.5))
+                    .foregroundStyle(Ink.text3)
                     .fixedSize()
                 }
-                .padding(.horizontal, 12)
-                .frame(height: 40)
-                .contentShape(Rectangle())
+                .padding(.horizontal, 14)
+                .frame(height: 42)
+                .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .hoverFill(cornerRadius: 8)
-            .animation(.timingCurve(0.2, 0.7, 0.2, 1, duration: 0.15), value: isOpen)
+            .hoverFill(cornerRadius: 21)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isOpen)
             .accessibilityValue(isOpen ? "Expanded" : "Collapsed")
 
             if isOpen {
@@ -156,7 +157,7 @@ struct SpeechModelsView: View {
         let isReady = state == .downloaded
         let isSelected = selectedId == model.id
         let isOffering = isSelected && !isReady && progress == nil && modelManager.activeModelId != model.id
-        let size = Graphite.formatBytes(model.approximateBytes)
+        let size = Ink.formatBytes(model.approximateBytes)
 
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 12) {
@@ -165,32 +166,32 @@ struct SpeechModelsView: View {
                     .accessibilityLabel("\(model.fullName), \(size), \(statusDescription(model, state))")
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
                 Text(model.displayName)
-                    .font(.inter(13.5, .medium))
-                    .foregroundStyle(Graphite.text)
+                    .font(.sans(14, .semibold))
+                    .foregroundStyle(Ink.text)
                     .lineLimit(1)
                     .frame(width: 76, alignment: .leading)
                 Group {
                     if listWidth > 470 {
                         modelDescription(model, state: state, progress: progress)
-                            .font(.inter(14))
-                            .foregroundStyle(Graphite.text2)
+                            .font(.sans(14))
+                            .foregroundStyle(Ink.text2)
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Text(size)
-                    .font(.inter(12.5))
+                    .font(.sans(12.5))
                     .monospacedDigit()
-                    .foregroundStyle(Graphite.text2)
+                    .foregroundStyle(Ink.text2)
                     .frame(width: 62, alignment: .trailing)
                 modelStatus(model, state: state, progress: progress, isOffering: isOffering)
-                    .font(.inter(12.5))
+                    .font(.sans(12.5))
                     .frame(width: 96, alignment: .trailing)
                 modelAction(model, state: state, isDownloading: progress != nil)
-                    .frame(width: 28)
+                    .frame(width: 30)
             }
-            .frame(minHeight: 40)
+            .frame(minHeight: 42)
 
             Group {
                 if confirmingDelete == model.id {
@@ -199,25 +200,25 @@ struct SpeechModelsView: View {
                     downloadOffer(model)
                 }
             }
-            .padding(.leading, 28)
+            .padding(.leading, 30)
             .padding(.top, 2)
             .padding(.bottom, 12)
             .contentShape(Rectangle())
             .onTapGesture {}
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 14)
         .overlay(alignment: .bottom) {
             if let progress {
                 ProgressTrack(progress: progress)
-                    .padding(.leading, 40)
-                    .padding(.trailing, 12)
-                    .padding(.bottom, 3)
+                    .padding(.leading, 44)
+                    .padding(.trailing, 14)
+                    .padding(.bottom, 2)
                     .accessibilityLabel("\(model.fullName) download")
                     .accessibilityValue("\(Int((progress * 100).rounded())) percent")
             }
         }
         .contentShape(Rectangle())
-        .hoverFill(cornerRadius: 8)
+        .hoverFill(cornerRadius: 21)
         .onTapGesture { pick(model) }
         .contextMenu {
             if progress == nil { modelMenuItems(model, state: state) }
@@ -228,9 +229,9 @@ struct SpeechModelsView: View {
     private func modelDescription(_ model: KnownWhisperModel, state: ModelDownloadState, progress: Double?) -> some View {
         if let progress {
             Text("Downloading · ")
-                + Text(Graphite.formatBytes(Int64(Double(model.approximateBytes) * progress))).monospacedDigit()
+                + Text(Ink.formatBytes(Int64(Double(model.approximateBytes) * progress))).monospacedDigit()
         } else if case .failed(let message) = state {
-            Text("Download failed").foregroundStyle(Graphite.accent).help(message)
+            Text("Download failed").fontWeight(.semibold).foregroundStyle(Ink.text).help(message)
         } else {
             Text(model.description).help(model.description)
         }
@@ -241,11 +242,11 @@ struct SpeechModelsView: View {
         if let progress {
             Text("\(Int((progress * 100).rounded()))%")
                 .monospacedDigit()
-                .foregroundStyle(Graphite.text3)
+                .foregroundStyle(Ink.text3)
         } else if modelManager.activeModelId == model.id {
             DotLabel("In use")
         } else if state == .downloaded {
-            Text(model.isBundled ? "Built in" : "On disk").foregroundStyle(Graphite.text3)
+            Text(model.isBundled ? "Built in" : "On disk").foregroundStyle(Ink.text3)
         } else if !isOffering {
             // The offer below the row already has its own Download button.
             Button {
@@ -256,11 +257,11 @@ struct SpeechModelsView: View {
                     Text("Download")
                 }
             }
-            .buttonStyle(GraphiteChipButtonStyle())
+            .buttonStyle(InkChipButtonStyle())
             .padding(.trailing, -6)
             .disabled(modelManager.isDownloading)
-            .help(modelManager.isDownloading ? "One download at a time" : "Download \(Graphite.formatBytes(model.approximateBytes))")
-            .accessibilityLabel("Download \(model.fullName), \(Graphite.formatBytes(model.approximateBytes))")
+            .help(modelManager.isDownloading ? "One download at a time" : "Download \(Ink.formatBytes(model.approximateBytes))")
+            .accessibilityLabel("Download \(model.fullName), \(Ink.formatBytes(model.approximateBytes))")
         }
     }
 
@@ -273,13 +274,13 @@ struct SpeechModelsView: View {
             } label: {
                 Image(systemName: "xmark").font(.system(size: 11, weight: .semibold))
             }
-            .buttonStyle(GraphiteIconButtonStyle())
+            .buttonStyle(InkIconButtonStyle())
             .help("Cancel download")
             .accessibilityLabel("Cancel download")
         } else if state != .downloaded || !isInUse || !model.isBundled {
             RowMenuButton(model.fullName) { modelMenuItems(model, state: state) }
         } else {
-            Color.clear.frame(width: 28, height: 28)
+            Color.clear.frame(width: 30, height: 30)
         }
     }
 
@@ -292,7 +293,7 @@ struct SpeechModelsView: View {
             }
             .disabled(modelManager.isDownloading)
             Button { download(model, andUse: false) } label: {
-                Label("Download only · \(Graphite.formatBytes(model.approximateBytes))", systemImage: "arrow.down.to.line")
+                Label("Download only · \(Ink.formatBytes(model.approximateBytes))", systemImage: "arrow.down.to.line")
             }
             .disabled(modelManager.isDownloading)
         } else {
@@ -309,8 +310,8 @@ struct SpeechModelsView: View {
     }
 
     private func deleteConfirm(_ model: KnownWhisperModel) -> some View {
-        let name = Text(model.displayName).font(.inter(14, .medium)).foregroundColor(Graphite.text)
-        let frees = "Frees \(Graphite.formatBytes(model.approximateBytes))."
+        let name = Text(model.displayName).font(.sans(14, .semibold)).foregroundColor(Ink.text)
+        let frees = "Frees \(Ink.formatBytes(model.approximateBytes))."
         let message = modelManager.activeModelId == model.id
             ? name + Text(" is in use. Delete it and switch to \(KnownWhisperModel.fallback?.fullName ?? "Whisper Base")? \(frees)")
             : Text("Delete ") + name + Text(" from this Mac? \(frees)")
@@ -323,18 +324,18 @@ struct SpeechModelsView: View {
     }
 
     private func downloadOffer(_ model: KnownWhisperModel) -> some View {
-        let name = Text(model.displayName).font(.inter(14, .medium)).foregroundColor(Graphite.text)
+        let name = Text(model.displayName).font(.sans(14, .semibold)).foregroundColor(Ink.text)
         return HStack(spacing: 8) {
             (Text("\(activeModel?.fullName ?? "The current model") stays in use until ") + name + Text(" is downloaded."))
-                .font(.inter(14))
-                .foregroundStyle(Graphite.text2)
+                .font(.sans(14))
+                .foregroundStyle(Ink.text2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
             Button("Not now") { chosenId = nil }
-                .buttonStyle(.graphite(.plain))
+                .buttonStyle(.ink(.plain))
                 .keyboardShortcut(.cancelAction)
-            Button("Download \(Graphite.formatBytes(model.approximateBytes))") { download(model, andUse: true) }
-                .buttonStyle(.graphite(.primary))
+            Button("Download \(Ink.formatBytes(model.approximateBytes))") { download(model, andUse: true) }
+                .buttonStyle(.ink(.primary))
                 .disabled(modelManager.isDownloading)
                 .help(modelManager.isDownloading ? "One download at a time" : "")
         }
@@ -398,8 +399,8 @@ struct SpeechModelsView: View {
             return
         }
         var note = Text("Deleted ")
-            + Text(model.fullName).font(.inter(14, .semibold))
-            + Text(" · \(Graphite.formatBytes(model.approximateBytes)) freed")
+            + Text(model.fullName).font(.sans(14, .bold))
+            + Text(" · \(Ink.formatBytes(model.approximateBytes)) freed")
         if wasInUse, let fallback = KnownWhisperModel.fallback {
             note = note + Text(" · now using \(fallback.fullName)")
             if let engine = SpeechEngine.all.first(where: { $0.models.contains(fallback) }) {
@@ -410,21 +411,21 @@ struct SpeechModelsView: View {
     }
 }
 
-/// A 2pt download bar along the bottom of a model row.
+/// A 4pt ink download bar along the bottom of a model row.
 private struct ProgressTrack: View {
     let progress: Double
 
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                Rectangle().fill(Graphite.hairline)
-                Rectangle()
-                    .fill(Graphite.accent)
+                Capsule().fill(Ink.fill)
+                Capsule()
+                    .fill(Ink.ink)
                     .frame(width: geometry.size.width * min(max(progress, 0), 1))
                     .animation(.linear(duration: 0.1), value: progress)
             }
         }
-        .frame(height: 2)
-        .clipShape(RoundedRectangle(cornerRadius: 1))
+        .frame(height: 4)
+        .clipShape(Capsule())
     }
 }

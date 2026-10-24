@@ -14,9 +14,8 @@ struct DashboardView: View {
             }
         }
         .environment(dashboard)
-        .environment(\.colorScheme, .dark)
         .frame(minWidth: 700, minHeight: 500)
-        .background(Graphite.background)
+        .background(Ink.paper)
         .ignoresSafeArea()
         .onReceive(
             NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
@@ -139,7 +138,7 @@ struct DashboardShell: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 ToastHost()
             }
-            .background(Graphite.background)
+            .background(Ink.paper)
         }
         .background { shortcuts }
         .onAppear {
@@ -179,6 +178,7 @@ struct DashboardShell: View {
 
 // MARK: - Sidebar
 
+/// One ink blob. The current page is a paper tab that reaches out of the page into it.
 private struct Sidebar: View {
     @Environment(DashboardModel.self) private var dashboard
 
@@ -187,36 +187,82 @@ private struct Sidebar: View {
             Button {
                 dashboard.page = .home
             } label: {
-                Text("Shh..")
-                    .font(.inter(15, .semibold))
-                    .tracking(-0.3)
-                    .foregroundStyle(Graphite.text)
+                HStack(spacing: 10) {
+                    InkMarkView(spraysOnHover: true)
+                        .frame(width: 34, height: 39)
+                    DisplayText("Shh..", size: 25, stroke: 0.8, lineHeight: 1, tracking: 0.02)
+                        .accessibilityHidden(true)
+                }
+                .foregroundStyle(Ink.onInk)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.leading, 10)
-            .padding(.top, 46)
+            .padding(.leading, 8)
+            .padding(.top, 44)
+            .accessibilityLabel("Shh.. home")
 
-            VStack(spacing: 2) {
+            VStack(spacing: 3) {
                 NavRow(page: .home)
                 NavRow(page: .styles)
-                Spacer().frame(height: 16)
+                Spacer().frame(height: 18)
                 NavRow(page: .speech)
                 NavRow(page: .providers)
             }
-            .padding(.top, 20)
+            .padding(.top, 24)
 
             Spacer(minLength: 16)
 
-            VStack(spacing: 2) {
+            VStack(spacing: 3) {
                 NavRow(page: .settings)
                 NavRow(page: .help)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.bottom, 14)
-        .frame(width: 188)
+        .padding(.leading, 12)
+        // Room under the last tab for its lower corner before the blob curves away.
+        .padding(.bottom, 48)
+        .frame(width: 196)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(Graphite.sidebar)
+        .backgroundPreferenceValue(NavRowFrames.self) { frames in
+            GeometryReader { geometry in
+                if let anchor = frames[dashboard.page] {
+                    PageTab(frame: geometry[anchor], sidebarWidth: geometry.size.width, page: dashboard.page)
+                }
+            }
+        }
+        .background(Ink.ink, in: UnevenRoundedRectangle(bottomTrailingRadius: 28, topTrailingRadius: 28, style: .continuous))
+    }
+}
+
+/// Where each nav row sits, so the tab can find the current one.
+private struct NavRowFrames: PreferenceKey {
+    static let defaultValue: [DashboardPage: Anchor<CGRect>] = [:]
+
+    static func reduce(value: inout [DashboardPage: Anchor<CGRect>], nextValue: () -> [DashboardPage: Anchor<CGRect>]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
+
+/// Slides to the current row with a little overshoot, and shortens as it travels, like a drop
+/// pulled along the blob's edge.
+private struct PageTab: View {
+    let frame: CGRect
+    let sidebarWidth: CGFloat
+    let page: DashboardPage
+
+    var body: some View {
+        LiquidTab()
+            .fill(Ink.paper)
+            .frame(width: sidebarWidth - frame.minX, height: frame.height)
+            .keyframeAnimator(initialValue: CGSize(width: 1, height: 1), trigger: page) { tab, scale in
+                tab.scaleEffect(scale, anchor: .trailing)
+            } keyframes: { _ in
+                CubicKeyframe(CGSize(width: 0.72, height: 0.82), duration: 0.16)
+                CubicKeyframe(CGSize(width: 1, height: 1), duration: 0.29)
+            }
+            .offset(x: frame.minX, y: frame.minY)
+            .animation(.spring(response: 0.42, dampingFraction: 0.72), value: frame)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }
 
@@ -230,60 +276,62 @@ private struct NavRow: View {
         Button {
             dashboard.page = page
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: 11) {
                 Image(systemName: page.icon)
-                    .font(.system(size: 13))
-                    .frame(width: 16)
-                    .foregroundStyle(isSelected ? Graphite.accent : isHovered ? Graphite.text2 : Graphite.text3)
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 18)
                 Text(page.title)
-                    .font(.inter(13.5, isSelected ? .medium : .regular))
-                    .foregroundStyle(isSelected || isHovered ? Graphite.text : Graphite.text2)
+                    .font(.sans(14, isSelected ? .semibold : .medium))
                     .lineLimit(1)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 10)
-            .frame(height: 32)
-            .background(
-                isSelected ? Graphite.selected : isHovered ? Graphite.hover : .clear,
-                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
-            )
-            .contentShape(Rectangle())
+            .foregroundStyle(isSelected ? Ink.ink : isHovered ? Ink.onInk : Ink.onInk2)
+            .padding(.horizontal, 12)
+            .frame(height: 36)
+            .background(!isSelected && isHovered ? Ink.inkHover : .clear, in: Capsule())
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .padding(.trailing, 12)
+        .anchorPreference(key: NavRowFrames.self, value: .bounds) { [page: $0] }
         .onHover { isHovered = $0 }
-        .animation(.easeOut(duration: 0.12), value: isHovered)
+        .animation(.easeOut(duration: 0.15), value: isHovered)
+        .animation(.easeOut(duration: 0.2), value: isSelected)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
 // MARK: - Toast
 
+/// An ink pill at the bottom of the page.
 private struct ToastHost: View {
     @Environment(DashboardModel.self) private var dashboard
 
     var body: some View {
         if let toast = dashboard.toast {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 toast.message
-                    .font(.inter(14))
-                    .foregroundStyle(Graphite.text)
+                    .font(.sans(14, .medium))
+                    .foregroundStyle(Ink.onInk)
                 if toast.undo != nil {
                     Button("Undo") { dashboard.undoToast() }
-                        .buttonStyle(.graphite(.plain))
+                        .font(.sans(13.5, .semibold))
+                        .foregroundStyle(Ink.ink)
+                        .padding(.horizontal, 12)
+                        .frame(height: 32)
+                        .background(Ink.paper, in: Capsule())
+                        .contentShape(Capsule())
+                        .buttonStyle(.plain)
                 }
             }
-            .padding(.leading, 14)
-            .padding(.trailing, toast.undo == nil ? 14 : 6)
+            .padding(.leading, 18)
+            .padding(.trailing, toast.undo == nil ? 18 : 6)
             .padding(.vertical, toast.undo == nil ? 9 : 6)
-            .background(Graphite.raised, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.07), lineWidth: 1)
-            }
-            .shadow(color: .black.opacity(0.5), radius: 18, y: 14)
+            .background(Ink.ink, in: Capsule())
+            .shadow(color: Ink.shadow, radius: 20, y: 14)
             .padding(.bottom, 22)
             .id(toast.id)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .transition(.scale(scale: 0.85, anchor: .bottom).combined(with: .opacity).combined(with: .offset(y: 10)))
             .accessibilityElement(children: .contain)
         }
     }

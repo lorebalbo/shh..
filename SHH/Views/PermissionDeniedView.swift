@@ -5,16 +5,14 @@ struct PermissionDeniedView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Permissions needed")
-                .font(.inter(27, .semibold))
-                .tracking(-0.54)
-                .foregroundStyle(Graphite.text)
+            DisplayText("Permissions needed", size: 40, stroke: 1.1, lineHeight: 1.05)
+                .foregroundStyle(Ink.text)
                 .accessibilityAddTraits(.isHeader)
             Text("Shh.. needs these to hear you and to notice when you hold fn.")
-                .font(.inter(14))
+                .font(.sans(14))
                 .lineSpacing(4)
-                .foregroundStyle(Graphite.text2)
-                .padding(.top, 4)
+                .foregroundStyle(Ink.text2)
+                .padding(.top, 12)
                 .padding(.bottom, 24)
 
             permissionRow(
@@ -36,9 +34,9 @@ struct PermissionDeniedView: View {
                 settingsAction: { permissionManager.openMicrophoneSettings() }
             )
         }
-        .frame(width: 520)
+        .frame(width: 560)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Graphite.background)
+        .background(Ink.paper)
         .onAppear {
             permissionManager.refreshPermissions()
         }
@@ -58,13 +56,13 @@ struct PermissionDeniedView: View {
                     Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold))
                     Text("Granted")
                 }
-                .font(.inter(12.5))
-                .foregroundStyle(Graphite.text3)
+                .font(.sans(12.5, .semibold))
+                .foregroundStyle(Ink.text)
             } else {
                 Button("Open Settings", action: settingsAction)
-                    .buttonStyle(.graphite(.plain))
+                    .buttonStyle(.ink(.plain))
                 Button("Grant access", action: action)
-                    .buttonStyle(.graphite(.primary))
+                    .buttonStyle(.ink(.primary))
             }
         }
     }

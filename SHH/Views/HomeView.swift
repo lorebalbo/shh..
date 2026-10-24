@@ -53,54 +53,51 @@ struct HomeView: View {
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Graphite.text3)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isSearchFocused ? Ink.text : Ink.text3)
             TextField("Search dictations", text: $searchText, prompt: Text(""))
                 .textFieldStyle(.plain)
-                .font(.inter(13.5))
-                .foregroundStyle(Graphite.text)
+                .font(.sans(13.5))
+                .foregroundStyle(Ink.text)
                 .focused($isSearchFocused)
                 .focusEffectDisabled()
                 .onExitCommand { searchText = "" }
                 .overlay(alignment: .leading) {
                     if searchText.isEmpty {
                         Text("Search")
-                            .font(.inter(13.5))
-                            .foregroundStyle(Graphite.text3)
+                            .font(.sans(13.5))
+                            .foregroundStyle(Ink.text3)
                             .allowsHitTesting(false)
                             .accessibilityHidden(true)
                     }
                 }
             if searchText.isEmpty {
                 Text("⌘F")
-                    .font(.inter(12))
-                    .foregroundStyle(Graphite.text3)
-                    .padding(.trailing, 5)
+                    .font(.sans(12))
+                    .foregroundStyle(Ink.text3)
+                    .padding(.trailing, 6)
                     .accessibilityHidden(true)
             } else {
                 Button {
                     searchText = ""
                     isSearchFocused = true
                 } label: {
-                    Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Ink.onInk)
+                        .frame(width: 22, height: 22)
+                        .background(Ink.ink, in: Circle())
+                        .contentShape(Circle())
                 }
-                .buttonStyle(GraphiteIconButtonStyle())
-                .frame(width: 22, height: 22)
+                .buttonStyle(.plain)
                 .accessibilityLabel("Clear search")
             }
         }
-        .padding(.leading, 11)
-        .padding(.trailing, 6)
-        .frame(width: 220, height: 32)
-        .background(
-            isSearchFocused ? Graphite.fieldFocus : Graphite.fill,
-            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(Graphite.ring, lineWidth: isSearchFocused ? 1 : 0)
-        }
-        .contentShape(Rectangle())
+        .padding(.leading, 13)
+        .padding(.trailing, 7)
+        .frame(width: 220, height: 34)
+        .modifier(InkFieldStyle(isFocused: isSearchFocused, shape: Capsule()))
+        .contentShape(Capsule())
         .onTapGesture { isSearchFocused = true }
     }
 
@@ -109,7 +106,7 @@ struct HomeView: View {
     @ViewBuilder
     private var history: some View {
         if entries.isEmpty {
-            EmptyState("No dictations yet") {
+            EmptyState("No dictations yet", showsMark: true) {
                 Text("Hold fn anywhere on your Mac. What you say shows up here.")
             }
         } else if filteredEntries.isEmpty {
@@ -119,12 +116,9 @@ struct HomeView: View {
         } else {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(groupedByDay.enumerated()), id: \.element.day) { index, group in
-                    Text(dayTitle(group.day))
-                        .font(.inter(12.5, .semibold))
-                        .foregroundStyle(Graphite.text2)
-                        .padding(.top, index == 0 ? 0 : 36)
-                        .padding(.bottom, 6)
-                        .accessibilityAddTraits(.isHeader)
+                    SectionTitle(dayTitle(group.day))
+                        .padding(.top, index == 0 ? 2 : 40)
+                        .padding(.bottom, 8)
                     HairlineStack(group.entries) { entry in
                         entryRow(entry)
                     }
@@ -178,9 +172,9 @@ struct HomeView: View {
                     copy(entry)
                 } label: {
                     Text(highlighted(displayedText(entry)))
-                        .font(.inter(14.5))
-                        .lineSpacing(5.5)
-                        .foregroundStyle(isOriginal ? Graphite.text2 : Graphite.text)
+                        .font(.sans(15))
+                        .lineSpacing(5)
+                        .foregroundStyle(isOriginal ? Ink.text2 : Ink.text)
                         .lineLimit(3)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: 560, alignment: .leading)
@@ -194,12 +188,12 @@ struct HomeView: View {
                     HStack(spacing: 6) {
                         Text(isOriginal ? "Original transcript" : "Rewritten with \(styleName ?? "a style")")
                         Text("·").accessibilityHidden(true)
-                        TextLink(isOriginal ? rewrittenVersion : "Show original", color: Graphite.text2) {
+                        TextLink(isOriginal ? rewrittenVersion : "Show original", color: Ink.text2) {
                             toggleOriginal(entry)
                         }
                     }
-                    .font(.inter(12.5))
-                    .foregroundStyle(Graphite.text3)
+                    .font(.sans(12.5))
+                    .foregroundStyle(Ink.text3)
                     .padding(.top, 2)
                 }
             }
@@ -208,15 +202,19 @@ struct HomeView: View {
             HStack(spacing: 4) {
                 Group {
                     if copiedID == entry.id {
-                        Text("Copied").foregroundStyle(Graphite.accent)
+                        HStack(spacing: 6) {
+                            InkDrops(motion: .splash, height: 16)
+                            Text("Copied").fontWeight(.semibold)
+                        }
+                        .foregroundStyle(Ink.text)
                     } else {
                         Text(entry.timestamp, format: .dateTime.hour().minute())
                             .monospacedDigit()
-                            .foregroundStyle(Graphite.text3)
+                            .foregroundStyle(Ink.text3)
                     }
                 }
-                .font(.inter(12.5))
-                .frame(minWidth: 38, alignment: .trailing)
+                .font(.sans(12.5))
+                .frame(minWidth: 40, alignment: .trailing)
 
                 RowMenuButton("dictation from \(entry.timestamp.formatted(.dateTime.hour().minute()))") {
                     entryMenuItems(entry, rewrittenVersion: rewrittenVersion)
@@ -250,7 +248,8 @@ struct HomeView: View {
         while let match = text.range(of: query, options: [.caseInsensitive, .diacriticInsensitive], range: searchRange) {
             if let lower = AttributedString.Index(match.lowerBound, within: attributed),
                let upper = AttributedString.Index(match.upperBound, within: attributed) {
-                attributed[lower..<upper].backgroundColor = Graphite.searchMark
+                attributed[lower..<upper].backgroundColor = Ink.ink
+                attributed[lower..<upper].foregroundColor = Ink.paper
             }
             searchRange = match.upperBound..<text.endIndex
         }
@@ -294,7 +293,7 @@ struct HomeView: View {
     #if DEBUG
     private var diagnosticPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Rectangle().fill(Graphite.hairline).frame(height: 1)
+            Rectangle().fill(Ink.hairline).frame(height: 1)
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) { showDiagnostics.toggle() }
             } label: {
@@ -306,7 +305,7 @@ struct HomeView: View {
                             .monospacedDigit()
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
-                            .background(Graphite.fill, in: Capsule())
+                            .background(Ink.fill, in: Capsule())
                     }
                     Spacer()
                     if !PipelineEventLog.shared.events.isEmpty {
@@ -315,8 +314,8 @@ struct HomeView: View {
                     }
                     Image(systemName: showDiagnostics ? "chevron.down" : "chevron.up")
                 }
-                .font(.inter(12))
-                .foregroundStyle(Graphite.text3)
+                .font(.sans(12))
+                .foregroundStyle(Ink.text3)
                 .padding(.horizontal, 44)
                 .padding(.vertical, 8)
                 .contentShape(Rectangle())
@@ -326,8 +325,8 @@ struct HomeView: View {
             if showDiagnostics {
                 if PipelineEventLog.shared.events.isEmpty {
                     Text("No events yet. Make a recording to see pipeline activity.")
-                        .font(.inter(12))
-                        .foregroundStyle(Graphite.text3)
+                        .font(.sans(12))
+                        .foregroundStyle(Ink.text3)
                         .padding(.horizontal, 44)
                         .padding(.bottom, 10)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -337,14 +336,14 @@ struct HomeView: View {
                             ForEach(PipelineEventLog.shared.events) { event in
                                 HStack(alignment: .top, spacing: 8) {
                                     Text(event.timestamp.formatted(.dateTime.hour().minute().second()))
-                                        .foregroundStyle(Graphite.text3)
+                                        .foregroundStyle(Ink.text3)
                                         .frame(width: 72, alignment: .leading)
                                     Text(event.message)
                                         .foregroundStyle(colorFor(event.kind))
                                         .textSelection(.enabled)
                                     Spacer()
                                 }
-                                .font(.graphiteMono(11))
+                                .font(.inkMono(11))
                             }
                         }
                         .padding(.horizontal, 44)
@@ -354,14 +353,14 @@ struct HomeView: View {
                 }
             }
         }
-        .background(Graphite.sidebar)
+        .background(Ink.paper)
     }
 
     private func colorFor(_ kind: PipelineEvent.Kind) -> Color {
         switch kind {
-        case .info: return Graphite.text2
+        case .info: return Ink.text2
         case .success: return .green
-        case .error: return Graphite.accent
+        case .error: return .red
         }
     }
     #endif
