@@ -56,16 +56,16 @@ final class OverlayPanel: NSPanel {
 /// steals focus from the active application.
 ///
 /// While recordings queue up, a click-through badge panel ("2 processing")
-/// sits against the widget: below it, or above it when the widget is on the
-/// bottom edge.
+/// sits just below the widget, over the Dock when the widget is on the bottom
+/// edge.
 /// Conforms to @unchecked Sendable because all mutations happen on the main thread.
 final class OverlayWidgetController: @unchecked Sendable {
 
     // MARK: - Constants
 
     static let widgetSize = CGSize(width: 88, height: 22)
-    static let badgeSize = CGSize(width: 88, height: 16)
-    private static let badgeGap: CGFloat = 3
+    static let badgeSize = CGSize(width: 100, height: 22)
+    private static let badgeGap: CGFloat = 0
 
     private enum UserDefaultsKey {
         static let positionX = "SHH_OverlayPositionX"
@@ -127,7 +127,8 @@ final class OverlayWidgetController: @unchecked Sendable {
             backing: .buffered,
             defer: false
         )
-        badgePanel.level = .floating
+        // Above the Dock, which the badge covers when the widget sits on the bottom edge.
+        badgePanel.level = .statusBar
         badgePanel.isOpaque = false
         badgePanel.backgroundColor = .clear
         badgePanel.hasShadow = false
@@ -222,18 +223,19 @@ final class OverlayWidgetController: @unchecked Sendable {
     }
 
     private func positionBadge() {
-        let visibleFrame = (panel.screen ?? NSScreen.main)?.visibleFrame
+        let screenFrame = (panel.screen ?? NSScreen.main)?.frame
         badgePanel.setFrameOrigin(
-            Self.badgeOrigin(widgetFrame: panel.frame, badgeSize: Self.badgeSize, visibleFrame: visibleFrame)
+            Self.badgeOrigin(widgetFrame: panel.frame, badgeSize: Self.badgeSize, screenFrame: screenFrame)
         )
     }
 
-    /// Centres the badge just below the widget, or just above it when there is no
-    /// room below (the widget sits on the bottom edge, above the Dock).
-    static func badgeOrigin(widgetFrame: NSRect, badgeSize: CGSize, visibleFrame: NSRect?) -> NSPoint {
+    /// Centres the badge just below the widget, over the Dock if that is what is
+    /// there. Only when it would run off the screen (the widget on the bottom edge
+    /// with the Dock hidden) does it go above instead.
+    static func badgeOrigin(widgetFrame: NSRect, badgeSize: CGSize, screenFrame: NSRect?) -> NSPoint {
         let x = widgetFrame.midX - badgeSize.width / 2
         let belowY = widgetFrame.minY - badgeGap - badgeSize.height
-        if let visibleFrame, belowY < visibleFrame.minY {
+        if let screenFrame, belowY < screenFrame.minY {
             return NSPoint(x: x, y: widgetFrame.maxY + badgeGap)
         }
         return NSPoint(x: x, y: belowY)

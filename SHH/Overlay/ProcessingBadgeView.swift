@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The "2 processing" label shown against the overlay widget while recordings
+/// The "2 processing" label shown below the overlay widget while recordings
 /// queue up. Hosted in its own click-through panel by OverlayWidgetController.
 struct ProcessingBadgeView: View {
     @ObservedObject var viewModel: OverlayViewModel
@@ -10,11 +10,16 @@ struct ProcessingBadgeView: View {
             .font(.system(size: 10, weight: .medium))
             .monospacedDigit()
             .lineLimit(1)
-            .foregroundStyle(.primary.opacity(0.8))
-            .padding(.horizontal, 7)
-            .frame(height: 14)
-            .background(Capsule().fill(.ultraThinMaterial))
-            .overlay(Capsule().strokeBorder(Color.orange.opacity(0.6), lineWidth: 1))
+            .foregroundStyle(.primary.opacity(0.85))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            // No pill or outline: just a blur that fades out at its edges, so the
+            // label stays readable over whatever is under it (often the Dock).
+            .background {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .mask(Capsule().padding(3).blur(radius: 3))
+            }
             .frame(width: OverlayWidgetController.badgeSize.width, height: OverlayWidgetController.badgeSize.height)
     }
 }

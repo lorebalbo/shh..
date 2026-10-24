@@ -110,24 +110,31 @@ final class TranscriptionQueueTests: XCTestCase {
 
     // MARK: - Badge placement
 
-    private let visibleFrame = NSRect(x: 0, y: 89, width: 1512, height: 860)
+    private let screenFrame = NSRect(x: 0, y: 0, width: 1512, height: 982)
     private let badgeSize = OverlayWidgetController.badgeSize
     private let widgetSize = OverlayWidgetController.widgetSize
 
-    func testBadgeSitsBelowTheWidgetWhenThereIsRoom() {
-        let widget = NSRect(origin: NSPoint(x: 700, y: 949 - widgetSize.height), size: widgetSize) // top edge
-        let origin = OverlayWidgetController.badgeOrigin(widgetFrame: widget, badgeSize: badgeSize, visibleFrame: visibleFrame)
+    func testBadgeSitsBelowTheWidgetOnTheTopEdge() {
+        let widget = NSRect(origin: NSPoint(x: 700, y: 949 - widgetSize.height), size: widgetSize)
+        let origin = OverlayWidgetController.badgeOrigin(widgetFrame: widget, badgeSize: badgeSize, screenFrame: screenFrame)
 
-        XCTAssertLessThan(origin.y + badgeSize.height, widget.minY)
+        XCTAssertEqual(origin.y + badgeSize.height, widget.minY, accuracy: 0.1)
         XCTAssertEqual(origin.x + badgeSize.width / 2, widget.midX, accuracy: 0.1)
     }
 
-    func testBadgeSitsAboveTheWidgetOnTheBottomEdge() {
-        let widget = NSRect(origin: NSPoint(x: 1367, y: 89), size: widgetSize) // bottom edge, above the Dock
-        let origin = OverlayWidgetController.badgeOrigin(widgetFrame: widget, badgeSize: badgeSize, visibleFrame: visibleFrame)
+    func testBadgeSitsBelowTheWidgetOverTheDock() {
+        let widget = NSRect(origin: NSPoint(x: 1367, y: 89), size: widgetSize) // bottom edge, just above the Dock
+        let origin = OverlayWidgetController.badgeOrigin(widgetFrame: widget, badgeSize: badgeSize, screenFrame: screenFrame)
 
-        XCTAssertGreaterThan(origin.y, widget.maxY)
-        XCTAssertLessThan(origin.y, widget.maxY + 10)
+        XCTAssertEqual(origin.y + badgeSize.height, widget.minY, accuracy: 0.1)
+        XCTAssertEqual(origin.x + badgeSize.width / 2, widget.midX, accuracy: 0.1)
+    }
+
+    func testBadgeGoesAboveTheWidgetWhenBelowIsOffScreen() {
+        let widget = NSRect(origin: NSPoint(x: 700, y: 4), size: widgetSize) // bottom edge, Dock hidden
+        let origin = OverlayWidgetController.badgeOrigin(widgetFrame: widget, badgeSize: badgeSize, screenFrame: screenFrame)
+
+        XCTAssertEqual(origin.y, widget.maxY, accuracy: 0.1)
         XCTAssertEqual(origin.x + badgeSize.width / 2, widget.midX, accuracy: 0.1)
     }
 }
