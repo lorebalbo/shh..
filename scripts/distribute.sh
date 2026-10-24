@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# distribute.sh — Builds SHH and packages it as a shareable DMG.
+# distribute.sh — Builds Shh.. and packages it as a shareable DMG.
 #
 # Usage:
 #   ./scripts/distribute.sh
 #
-# Output: SHH-<version>.dmg in the project root.
+# Output: Shh-<version>.dmg in the project root.
 #
 # Prerequisites: xcodegen (brew install xcodegen), Xcode command-line tools
 #
 # NOTE: This build is not notarized with Apple. Recipients must right-click
-#       "SHH.app" and choose "Open" the first time to bypass Gatekeeper.
+#       "Shh.." and choose "Open" the first time to bypass Gatekeeper.
 #       The app requires macOS 14.0+ and Apple Silicon (M-series Mac).
 
 set -euo pipefail
@@ -17,15 +17,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$PROJECT_DIR/build"
-APP_NAME="SHH"
+APP_NAME="Shh.."
 SCHEME="SHH"
 
 # Read version from Info.plist
 VERSION=$(defaults read "$PROJECT_DIR/SHH/Info.plist" CFBundleShortVersionString 2>/dev/null || echo "1.0")
-DMG_NAME="${APP_NAME}-${VERSION}.dmg"
+DMG_NAME="Shh-${VERSION}.dmg"
 DMG_PATH="$PROJECT_DIR/$DMG_NAME"
 
-echo "==> SHH — Package for Distribution (v${VERSION})"
+echo "==> $APP_NAME — Package for Distribution (v${VERSION})"
 echo ""
 
 # ── 1. Download Whisper model if needed ───────────────────────────────────────
@@ -50,7 +50,7 @@ echo "[4/5] Building Release..."
 rm -rf "$BUILD_DIR"
 BUILD_ARGS=(
     -scheme "$SCHEME"
-    -project "$APP_NAME.xcodeproj"
+    -project "$SCHEME.xcodeproj"
     -configuration Release
     -destination 'platform=macOS,arch=arm64'
     -derivedDataPath "$BUILD_DIR"
@@ -105,9 +105,9 @@ echo "  or any file-sharing service and send the link to your friends."
 echo ""
 echo "What your friends need to do:"
 echo "  1. Open ${DMG_NAME}"
-echo "  2. Drag SHH.app into the Applications folder shown in the DMG"
+echo "  2. Drag ${APP_NAME} into the Applications folder shown in the DMG"
 echo "  3. Eject the DMG"
-echo "  4. Find SHH in Applications, RIGHT-CLICK it, and choose 'Open'"
+echo "  4. Find ${APP_NAME} in Applications, RIGHT-CLICK it, and choose 'Open'"
 echo "     (required only the first time — bypasses macOS Gatekeeper)"
 echo ""
 echo "System requirements: macOS 14 Sonoma or later, Apple Silicon (M-series)"

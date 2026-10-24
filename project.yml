@@ -17,6 +17,9 @@ targets:
           - "SHH-Bridging-Header.h"
     settings:
       base:
+        # The bundle is "Shh...app", shown as "Shh.." in Finder, the Dock and Spotlight.
+        PRODUCT_NAME: "Shh.."
+        PRODUCT_MODULE_NAME: SHH
         PRODUCT_BUNDLE_IDENTIFIER: com.shh.voice-utility
         INFOPLIST_FILE: SHH/Info.plist
         CODE_SIGN_ENTITLEMENTS: SHH/SHH.entitlements

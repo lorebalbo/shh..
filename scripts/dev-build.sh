@@ -12,7 +12,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$PROJECT_DIR/build"
-APP_NAME="SHH"
+APP_NAME="Shh.."
 SCHEME="SHH"
 REGEN=false
 
@@ -23,7 +23,7 @@ for arg in "$@"; do
     esac
 done
 
-echo "==> SHH — Dev Build (Debug)"
+echo "==> $APP_NAME — Dev Build (Debug)"
 echo ""
 
 # ── 1. Regenerate Xcode project only when requested ───────────────────────────
@@ -44,7 +44,7 @@ if command -v xcpretty &>/dev/null; then
     set -o pipefail
     xcodebuild \
         -scheme "$SCHEME" \
-        -project "$APP_NAME.xcodeproj" \
+        -project "$SCHEME.xcodeproj" \
         -configuration Debug \
         -derivedDataPath "$BUILD_DIR" \
         CODE_SIGN_IDENTITY="-" \
@@ -53,7 +53,7 @@ if command -v xcpretty &>/dev/null; then
 else
     xcodebuild \
         -scheme "$SCHEME" \
-        -project "$APP_NAME.xcodeproj" \
+        -project "$SCHEME.xcodeproj" \
         -configuration Debug \
         -derivedDataPath "$BUILD_DIR" \
         CODE_SIGN_IDENTITY="-" \

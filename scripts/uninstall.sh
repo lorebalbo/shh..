@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# uninstall.sh — Removes every copy of SHH.app from this Mac, together with
+# uninstall.sh — Removes every copy of Shh.. from this Mac, together with
 #                its associated caches, preferences, and app-support data.
 #
 # Usage:
@@ -8,7 +8,9 @@
 
 set -euo pipefail
 
-APP_NAME="SHH"
+APP_NAME="Shh.."
+# Builds before the rename were called SHH.app, and the app keeps its data under that name.
+OLD_NAME="SHH"
 BUNDLE_ID="com.shh.voice-utility"
 YES=false
 [[ "${1-}" == "--yes" ]] && YES=true
@@ -40,13 +42,15 @@ remove() {
 bold "==> $APP_NAME — Uninstaller"
 echo ""
 
-echo "Searching for ${APP_NAME}.app installations…"
+echo "Searching for ${APP_NAME} installations…"
 
 APP_LOCATIONS=(
     "/Applications/${APP_NAME}.app"
     "$HOME/Applications/${APP_NAME}.app"
     "$HOME/Desktop/${APP_NAME}.app"
     "$HOME/Downloads/${APP_NAME}.app"
+    "/Applications/${OLD_NAME}.app"
+    "$HOME/Applications/${OLD_NAME}.app"
 )
 
 # Also run a broader Spotlight search (mdfind is fast and non-blocking)
@@ -69,12 +73,12 @@ done
 # ── 2. Collect associated data ────────────────────────────────────────────────
 
 DATA_PATHS=(
-    "$HOME/Library/Application Support/${APP_NAME}"
+    "$HOME/Library/Application Support/${OLD_NAME}"
     "$HOME/Library/Application Support/${BUNDLE_ID}"
     "$HOME/Library/Preferences/${BUNDLE_ID}.plist"
     "$HOME/Library/Caches/${BUNDLE_ID}"
-    "$HOME/Library/Caches/${APP_NAME}"
-    "$HOME/Library/Logs/${APP_NAME}"
+    "$HOME/Library/Caches/${OLD_NAME}"
+    "$HOME/Library/Logs/${OLD_NAME}"
     "$HOME/Library/Logs/${BUNDLE_ID}"
     "$HOME/Library/Saved Application State/${BUNDLE_ID}.savedState"
     "$HOME/Library/HTTPStorages/${BUNDLE_ID}"
@@ -118,7 +122,7 @@ fi
 echo ""
 
 # Quit the app gracefully before removing it (ignore errors if not running)
-osascript -e "tell application \"${APP_NAME}\" to quit" 2>/dev/null || true
+osascript -e "tell application id \"${BUNDLE_ID}\" to quit" 2>/dev/null || true
 sleep 1
 
 for p in "${FOUND_APPS[@]}" "${FOUND_DATA[@]}"; do
@@ -128,6 +132,8 @@ done
 # Unregister from LaunchServices so the app no longer appears in Spotlight / Open With menus
 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister \
     -u "/Applications/${APP_NAME}.app" 2>/dev/null || true
+/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister \
+    -u "/Applications/${OLD_NAME}.app" 2>/dev/null || true
 
 echo ""
 green "Done! All copies of ${APP_NAME} have been removed."

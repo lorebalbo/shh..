@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build-and-install.sh — Builds SHH and installs it in /Applications.
+# build-and-install.sh — Builds Shh.. and installs it in /Applications.
 #
 # Usage:
 #   ./scripts/build-and-install.sh
@@ -11,10 +11,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$PROJECT_DIR/build"
-APP_NAME="SHH"
+APP_NAME="Shh.."
 SCHEME="SHH"
 
-echo "==> SHH — Build & Install"
+echo "==> $APP_NAME — Build & Install"
 echo ""
 
 # ── 1. Download Whisper model if needed ────────────────────────────────────────
@@ -40,7 +40,7 @@ rm -rf "$BUILD_DIR"
 if command -v xcpretty &>/dev/null; then
     xcodebuild \
         -scheme "$SCHEME" \
-        -project "$APP_NAME.xcodeproj" \
+        -project "$SCHEME.xcodeproj" \
         -configuration Release \
         -destination 'platform=macOS,arch=arm64' \
         -derivedDataPath "$BUILD_DIR" \
@@ -53,7 +53,7 @@ if command -v xcpretty &>/dev/null; then
 else
     xcodebuild \
         -scheme "$SCHEME" \
-        -project "$APP_NAME.xcodeproj" \
+        -project "$SCHEME.xcodeproj" \
         -configuration Release \
         -destination 'platform=macOS,arch=arm64' \
         -derivedDataPath "$BUILD_DIR" \
@@ -79,6 +79,13 @@ fi
 # (Dock, System Settings, Finder) when that date changes.
 rm -rf "/Applications/${APP_NAME}.app"
 cp -R "$APP_PATH" /Applications/
+
+# Builds before the rename were called SHH.app; don't leave a second copy behind.
+if [ -d "/Applications/SHH.app" ]; then
+    rm -rf "/Applications/SHH.app"
+    /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister \
+        -u "/Applications/SHH.app" 2>/dev/null || true
+fi
 
 # Refresh LaunchServices so macOS picks up the correct name and icon immediately
 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister \
