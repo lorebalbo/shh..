@@ -1,53 +1,66 @@
 # Xcode
-#
-# Xcode files/directories that should be ignored
-
 build/
-*.pbxproj
-*.xcworkspace
-xcuserdata/
 DerivedData/
-*.hmap
-*.xccheckout
-*.moved-aside
+xcuserdata/
+*.xcworkspace
 *.xcuserstate
 *.xcscmblueprint
+*.xccheckout
+*.moved-aside
+*.hmap
+*.dSYM
+*.dSYM.zip
 
-# CocoaPods
-Pods/
-*.xcworkspace
-
-# Carthage
-Carthage/Build/
+# XcodeGen generates the project from project.yml
+SHH.xcodeproj/
+*.pbxproj
 
 # Swift Package Manager
 .build/
+.swiftpm/
 
-# Fastlane
-fastlane/report.xml
-fastlane/Preview.html
-fastlane/screenshots/**/*.png
-fastlane/test_output
+# Whisper and VAD models: fetched by scripts/download-model.sh, too big for git
+ggml-*.bin
 
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-Icon
+# Release packaging (scripts/distribute.sh)
+*.dmg
 
-# Other
-*.swp
-*~.nib
-
-# XcodeGen specific
-SHH.xcodeproj
-
-# Benchmark datasets and reports (PRD-0004 / PRD-0005)
-build/benchmarks/
+# Benchmark datasets (PRD-0004 / PRD-0005); reports go to build/benchmarks/
 .cache/shh-benchmarks/
 shh-benchmarks/
 
-*.dmg
-*.txt
-# Python bytecode (e.g. from .claude/skills scripts)
+# Secrets, signing and local environment
+.env
+.env.*
+*.pem
+*.p12
+*.key
+*.cer
+*.mobileprovision
+*.provisionprofile
+
+# Claude Code: personal settings and worktrees (the shared skills stay tracked)
+.claude/settings.local.json
+.claude/worktrees/
+
+# Python and Node, for the scripts in .claude/skills
 __pycache__/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# macOS (the folder icon file is "Icon" plus a carriage return; written as two
+# because git strips one as a line ending, and a bare Icon would also ignore
+# any icon/ folder, since git ignores case on macOS)
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Icon
