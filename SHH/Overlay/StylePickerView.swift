@@ -2,161 +2,91 @@ import SwiftUI
 import SwiftData
 
 enum StylePickerMetrics {
-    static let width: CGFloat = 180
-    static let rowHeight: CGFloat = 28
-    static let rowSpacing: CGFloat = 2
-    static let verticalPadding: CGFloat = 12
-    static let dividerHeight: CGFloat = 1
-    static let tailHeight: CGFloat = 7
-    static let maxListHeight: CGFloat = 252
-    static let minimumListHeight: CGFloat = rowHeight + verticalPadding
-    static let minimumPanelHeight: CGFloat = minimumListHeight + tailHeight
+    static let width: CGFloat = 160
+    static let rowHeight: CGFloat = 26
+    static let padding: CGFloat = 4
+    /// The hairline under "No Style", with its margins.
+    static let separatorHeight: CGFloat = 9
+    static let cornerRadius: CGFloat = 16
+    static let maxHeight: CGFloat = 220
+    static let minimumHeight: CGFloat = rowHeight + padding * 2
 
-    static func listHeight(styleCount: Int) -> CGFloat {
-        let rowCount = styleCount + 1
-        let spacingCount = styleCount > 0 ? rowCount : 0
-        let contentHeight = CGFloat(rowCount) * rowHeight
-            + CGFloat(spacingCount) * rowSpacing
-            + (styleCount > 0 ? dividerHeight : 0)
-            + verticalPadding
+    static func height(styleCount: Int) -> CGFloat {
+        let contentHeight = CGFloat(styleCount + 1) * rowHeight
+            + (styleCount > 0 ? separatorHeight : 0)
+            + padding * 2
 
-        return min(max(contentHeight, minimumListHeight), maxListHeight)
-    }
-
-    static func panelHeight(styleCount: Int) -> CGFloat {
-        listHeight(styleCount: styleCount) + tailHeight
+        return min(max(contentHeight, minimumHeight), maxHeight)
     }
 }
 
-/// A compact, semi-transparent style picker displayed as a speech-bubble popup
-/// attached to the recording overlay widget. Shows all available styles and
-/// allows one-tap switching of the active style for the current recording.
+/// The style picker shown against the recording widget: a compact take on the dashboard's
+/// menu in the widget's see-through ink, with a row per style and a check beside the active
+/// one. One tap switches the active style for the current recording.
 struct StylePickerView: View {
     @ObservedObject var viewModel: StylePickerViewModel
-    @State private var hoveredStyleId: UUID?
-
-    private var listHeight: CGFloat {
-        StylePickerMetrics.listHeight(styleCount: viewModel.styles.count)
-    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if viewModel.placement == .belowWidget {
-                triangle(pointsUp: true)
-                    .offset(y: 1)
-            }
+        ScrollView(.vertical, showsIndicators: viewModel.styles.count > 7) {
+            VStack(spacing: 0) {
+                StyleRow(name: "No Style", isActive: viewModel.activeStyleId == nil) {
+                    viewModel.selectStyle(id: nil)
+                }
 
-            ScrollView(.vertical, showsIndicators: viewModel.styles.count > 7) {
-                styleList
-            }
-            .frame(width: StylePickerMetrics.width, height: listHeight)
-            .background(bubbleBackground)
-            .overlay(bubbleBorder)
-            .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 2)
+                if !viewModel.styles.isEmpty {
+                    Rectangle()
+                        .fill(Ink.inkHair)
+                        .frame(height: 1)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, (StylePickerMetrics.separatorHeight - 1) / 2)
+                }
 
-            if viewModel.placement == .aboveWidget {
-                triangle(pointsUp: false)
-                    .offset(y: -1)
+                ForEach(viewModel.styles) { style in
+                    StyleRow(name: style.name, isActive: viewModel.activeStyleId == style.id) {
+                        viewModel.selectStyle(id: style.id)
+                    }
+                }
             }
+            .padding(StylePickerMetrics.padding)
         }
         .frame(width: StylePickerMetrics.width)
-    }
-
-    private var styleList: some View {
-        VStack(spacing: StylePickerMetrics.rowSpacing) {
-            styleRow(
-                name: "No Style",
-                isActive: viewModel.activeStyleId == nil,
-                id: nil
-            )
-
-            if !viewModel.styles.isEmpty {
-                Divider()
-                    .frame(height: StylePickerMetrics.dividerHeight)
-                    .background(Color.appForeground.opacity(0.1))
-                    .padding(.horizontal, 8)
-            }
-
-            ForEach(viewModel.styles) { style in
-                styleRow(
-                    name: style.name,
-                    isActive: viewModel.activeStyleId == style.id,
-                    id: style.id
-                )
-            }
-        }
-        .padding(.vertical, StylePickerMetrics.verticalPadding / 2)
-    }
-
-    private var bubbleBackground: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(.ultraThinMaterial)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.appBackground.opacity(0.55))
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-
-    private var bubbleBorder: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .strokeBorder(Color.appForeground.opacity(0.12), lineWidth: 1)
-    }
-
-    private func triangle(pointsUp: Bool) -> some View {
-        Triangle()
-            .fill(.ultraThinMaterial)
-            .overlay(
-                Triangle()
-                    .fill(Color.appBackground.opacity(0.55))
-            )
-            .frame(width: 14, height: StylePickerMetrics.tailHeight)
-            .rotationEffect(.degrees(pointsUp ? 180 : 0))
-    }
-
-    // MARK: - Row
-
-    private func styleRow(name: String, isActive: Bool, id: UUID?) -> some View {
-        Button {
-            viewModel.selectStyle(id: id)
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(isActive ? Color.appError : Color.appForeground.opacity(0.35))
-
-                Text(name)
-                    .font(Font.appCaption)
-                    .foregroundStyle(Color.appForeground)
-                    .lineLimit(1)
-
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .frame(height: StylePickerMetrics.rowHeight)
-            .background(
-                (hoveredStyleId == id || (id == nil && hoveredStyleId == UUID(uuidString: "00000000-0000-0000-0000-000000000000")))
-                    ? Color.appForeground.opacity(0.08)
-                    : Color.clear
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovered in
-            hoveredStyleId = isHovered ? (id ?? UUID(uuidString: "00000000-0000-0000-0000-000000000000")) : nil
-        }
-        .padding(.horizontal, 4)
+        .frame(maxHeight: .infinity)
+        .background(RoundedRectangle(cornerRadius: StylePickerMetrics.cornerRadius, style: .continuous).inkGlass())
+        .clipShape(RoundedRectangle(cornerRadius: StylePickerMetrics.cornerRadius, style: .continuous))
     }
 }
 
-/// A small downward-pointing triangle used as the speech bubble tail.
-private struct Triangle: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
-        path.closeSubpath()
-        return path
+/// A menu row: a capsule that lights up on hover, the check showing on the active style.
+private struct StyleRow: View {
+    let name: String
+    let isActive: Bool
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 9.5, weight: .bold))
+                    .frame(width: 11)
+                    .opacity(isActive ? 1 : 0)
+
+                Text(name)
+                    .font(.sans(12, isActive ? .semibold : .regular))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(Ink.onInk)
+            .padding(.leading, 9)
+            .padding(.trailing, 10)
+            .frame(height: StylePickerMetrics.rowHeight)
+            .background(isHovered ? Ink.inkHover : .clear, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 }

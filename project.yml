@@ -73,8 +73,8 @@ targets:
       - path: SHH/Managers/GlobalInputManager.swift
       - path: SHH/Managers/TranscriptionQueue.swift
       - path: SHH/Overlay
-      - path: SHH/Views/Color+App.swift
-      - path: SHH/Views/FontExtension.swift
+      - path: SHH/Views/InkTheme.swift
+      - path: SHH/Views/InkShapes.swift
       - path: scripts/benchmark/Sources/WhisperTextNormalizer.swift
       - path: scripts/benchmark/Sources/WERCalculator.swift
       - path: scripts/benchmark/Sources/RTFxMeasurer.swift

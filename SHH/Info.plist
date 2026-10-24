@@ -27,12 +27,5 @@
 
     <key>NSMicrophoneUsageDescription</key>
     <string>Shh.. needs microphone access to capture voice dictation for transcription.</string>
-    <key>ATSApplicationFontsPath</key>
-    <string>Fonts</string>
-    <key>UIAppFonts</key>
-    <array>
-        <string>LeagueSpartan-VariableFont_wght.ttf</string>
-        <string>Fonts/LeagueSpartan-VariableFont_wght.ttf</string>
-    </array>
 </dict>
 </plist>

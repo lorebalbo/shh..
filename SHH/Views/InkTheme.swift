@@ -20,11 +20,12 @@ enum Ink {
     static let fillHover = tint(0.1, 0.13)
     static let off = tint(0.2, 0.26)
 
-    // On the ink blob: the sidebar, the toast, keys.
+    // On the ink blob: the sidebar, the toast, keys, the recording widget and its style picker.
     static let onInk = paper
     static let onInk2 = onInkTint(0.7, 0.7)
     static let onInk3 = onInkTint(0.45, 0.45)
     static let inkHover = onInkTint(0.11, 0.08)
+    static let inkHair = onInkTint(0.14, 0.12)
 
     static let shadow = adaptive(NSColor.black.withAlphaComponent(0.22), NSColor.black.withAlphaComponent(0.55))
     static let windowBackground = NSColor(name: nil) { appearance in

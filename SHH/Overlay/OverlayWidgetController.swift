@@ -108,7 +108,7 @@ final class OverlayWidgetController: @unchecked Sendable {
         panel.level = .floating
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        panel.hasShadow = false // A shadow would show through the see-through pill
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = false
         panel.becomesKeyOnlyIfNeeded = true

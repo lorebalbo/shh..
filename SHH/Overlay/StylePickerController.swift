@@ -9,8 +9,8 @@ private final class InteractiveOverlayPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-/// Manages the style picker popup panel that appears above the overlay widget
-/// when recording starts. Uses the same non-activating panel pattern as the
+/// Manages the style picker popup panel that appears above (or below) the overlay
+/// widget when recording starts. Uses the same non-activating panel pattern as the
 /// main overlay widget to avoid stealing focus.
 /// Conforms to @unchecked Sendable because all mutations happen on the main thread.
 final class StylePickerController: @unchecked Sendable {
@@ -23,7 +23,7 @@ final class StylePickerController: @unchecked Sendable {
     /// show() call can cancel the stale orderOut completion.
     private var pendingHide = false
 
-    private static let edgeGap: CGFloat = 4
+    private static let edgeGap: CGFloat = 8
     private static let screenMargin: CGFloat = 8
 
     init(viewModel: StylePickerViewModel) {
@@ -33,7 +33,7 @@ final class StylePickerController: @unchecked Sendable {
             origin: .zero,
             size: CGSize(
                 width: StylePickerMetrics.width,
-                height: StylePickerMetrics.panelHeight(styleCount: viewModel.styles.count)
+                height: StylePickerMetrics.height(styleCount: viewModel.styles.count)
             )
         )
 
@@ -47,7 +47,7 @@ final class StylePickerController: @unchecked Sendable {
         panel.level = .floating
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = false // The SwiftUI view handles its own shadow
+        panel.hasShadow = false // A shadow would show through the see-through ink
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = false
         panel.becomesKeyOnlyIfNeeded = true
@@ -107,7 +107,7 @@ final class StylePickerController: @unchecked Sendable {
     private func panelFrame(relativeTo widgetFrame: NSRect) -> NSRect {
         let preferredSize = CGSize(
             width: StylePickerMetrics.width,
-            height: StylePickerMetrics.panelHeight(styleCount: viewModel.styles.count)
+            height: StylePickerMetrics.height(styleCount: viewModel.styles.count)
         )
 
         guard let visibleFrame = screen(containing: widgetFrame)?.visibleFrame else {
@@ -126,18 +126,12 @@ final class StylePickerController: @unchecked Sendable {
             widgetFrame.minY - Self.edgeGap - visibleFrame.minY - Self.screenMargin,
             0
         )
-        let placement: StylePickerPlacement = availableAbove >= preferredSize.height || availableAbove >= availableBelow
-            ? .aboveWidget
-            : .belowWidget
+        let opensAbove = availableAbove >= preferredSize.height || availableAbove >= availableBelow
 
-        if viewModel.placement != placement {
-            viewModel.placement = placement
-        }
-
-        let availableHeight = placement == .aboveWidget ? availableAbove : availableBelow
+        let availableHeight = opensAbove ? availableAbove : availableBelow
         let panelHeight = min(
             preferredSize.height,
-            max(availableHeight, StylePickerMetrics.minimumPanelHeight)
+            max(availableHeight, StylePickerMetrics.minimumHeight)
         )
         let panelSize = CGSize(width: preferredSize.width, height: panelHeight)
 
@@ -146,7 +140,7 @@ final class StylePickerController: @unchecked Sendable {
             lowerBound: visibleFrame.minX + Self.screenMargin,
             upperBound: visibleFrame.maxX - panelSize.width - Self.screenMargin
         )
-        let unclampedOriginY = placement == .aboveWidget
+        let unclampedOriginY = opensAbove
             ? widgetFrame.maxY + Self.edgeGap
             : widgetFrame.minY - Self.edgeGap - panelSize.height
         let originY = Self.clamped(

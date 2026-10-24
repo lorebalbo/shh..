@@ -7,10 +7,10 @@ struct ProcessingBadgeView: View {
 
     var body: some View {
         Text(viewModel.queueLabel ?? "")
-            .font(.system(size: 10, weight: .medium))
+            .font(.sans(11, .semibold))
             .monospacedDigit()
             .lineLimit(1)
-            .foregroundStyle(.primary.opacity(0.85))
+            .foregroundStyle(Ink.text)
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
             // No pill or outline: just a blur that fades out at its edges, so the

@@ -173,18 +173,22 @@ struct InkDrops: View {
         }
     }
 
+    /// The loading pulse of drop `index` at `date`, from 0 to 1: once a second, staggered by
+    /// 0.15s per drop, up over the first 40% of the second and back down over the rest.
+    static func drip(at date: Date, index: Int) -> Double {
+        let t = (date.timeIntervalSinceReferenceDate - 0.15 * Double(index))
+            .truncatingRemainder(dividingBy: 1)
+        let up = t < 0.4 ? t / 0.4 : 1 - (t - 0.4) / 0.6
+        return 0.5 - cos(up * .pi) / 2
+    }
+
     private struct PulsingDrop: View {
         let drop: MarkPiece
         let index: Int
 
         var body: some View {
             TimelineView(.animation) { context in
-                let t = (context.date.timeIntervalSinceReferenceDate - 0.15 * Double(index))
-                    .truncatingRemainder(dividingBy: 1)
-                // Up over the first 40% of the second, back down over the rest.
-                let up = t < 0.4 ? t / 0.4 : 1 - (t - 0.4) / 0.6
-                let eased = 0.5 - cos(up * .pi) / 2
-                drop.opacity(0.2 + 0.8 * eased)
+                drop.opacity(0.2 + 0.8 * InkDrops.drip(at: context.date, index: index))
             }
         }
     }
